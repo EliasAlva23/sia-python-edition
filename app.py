@@ -110,6 +110,7 @@ def main() -> None:
     _inicializar_db()
     _capturar_enlace_qr()
     inyectar_css()
+    inyectar_pwa()  # al inicio: oculta los flotantes de Streamlit Cloud aunque una vista falle más abajo
     with st.sidebar:
         marca_sidebar()
         selector_tema()
@@ -127,7 +128,6 @@ def main() -> None:
             alumno.render(persona)
         _sidebar_pie(persona)
     footer()
-    inyectar_pwa()
 
 
 main()

@@ -122,6 +122,10 @@ header[data-testid="stHeader"] {{ visibility: hidden !important; background: tra
 }}
 [data-testid="stExpandSidebarButton"] * {{ color: #FFFFFF !important; }}
 .block-container {{ padding-top: 1.4rem; padding-bottom: 2.5rem; max-width: 1400px; }}
+/* Contenedores invisibles (bloque de estilos y script PWA): no ocupan lugar ni suman separación.
+   Los <style> y <script> siguen funcionando aunque su contenedor esté oculto. */
+[data-testid="stElementContainer"]:has(> [data-testid="stHtml"]),
+[data-testid="stElementContainer"]:has(> [data-testid="stMarkdown"] style) {{ display: none !important; }}
 section[data-testid="stSidebar"] {{ background: var(--sia-surface) !important; border-right: 1px solid var(--sia-border); }}
 section[data-testid="stSidebar"] * {{ color: var(--sia-ink); }}
 [data-testid="stMarkdownContainer"] p, [data-testid="stMarkdownContainer"] li,
@@ -403,23 +407,31 @@ button[data-testid="stBaseButton-elementToolbar"] {{ background: transparent !im
 """
 
 
-# Elementos flotantes de Streamlit / Streamlit Cloud (Manage app, distintivo "Hosted with Streamlit",
-# estado de ejecución, decoración superior). Se inyecta en la app y, por el script PWA, también en la página
-# contenedora de Streamlit Cloud, que es donde vive el botón "Manage app" (el CSS de la app no llega ahí).
-# stToolbar NO va con display:none: contiene el botón que abre la barra lateral en celulares; ya queda oculto
-# con visibility:hidden (heredado del encabezado) y ese botón se rescata con visibility:visible.
+# Elementos flotantes de Streamlit / Streamlit Cloud. Se inyecta en la app y, mediante el script PWA, también en
+# la página contenedora de Streamlit Cloud (mismo dominio, iframe con allow-same-origin).
+# Estructura real de esa página (inspeccionada en una app pública de Streamlit Cloud, vista móvil):
+#   - Botón rojo con la corona:  <a class="_container_gzau3_1 _viewerBadge_1j65n_23" href="https://streamlit.io/cloud">
+#     (es un <a>, no un <div>: por eso `div[class*="viewerBadge"]` no lo alcanzaba).
+#   - Avatar / acceso al perfil y repositorio del autor: <div class="_profileContainer_gzau3_53">
+# Los sufijos (_1j65n_23, _gzau3_53) son hashes de CSS Modules que cambian entre versiones, así que se usan
+# coincidencias parciales por nombre y por destino del enlace.
 CSS_OCULTAR_CLOUD = """
 .stAppViewerFooter,
 footer,
 [data-testid="stStatusWidget"],
 [data-testid="stDecoration"],
 [data-testid="stToolbarActions"],
+[data-testid="stToolbarActionButton"],
 [data-testid="stMainMenu"],
 [data-testid="stAppDeployButton"],
 [data-testid="manage-app-button"],
 .stDeployButton,
-div[class*="viewerBadge"],
-div[class*="styles_viewerBadge"],
+[class*="viewerBadge"],
+[class*="ViewerBadge"],
+[class*="_profileContainer_"],
+[class*="_profilePreview_"],
+a[href^="https://streamlit.io/cloud"],
+a[href*="share.streamlit.io/user/"],
 iframe[title="streamlit_badge"] {
   display: none !important;
   visibility: hidden !important;
@@ -431,6 +443,13 @@ iframe[title="streamlit_badge"] {
 [data-testid="stToolbar"] { visibility: hidden !important; }
 [data-testid="stExpandSidebarButton"] { visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; }
 """
+
+# Selectores de la página contenedora de Cloud que el script PWA además oculta en línea (refuerzo).
+SELECTORES_FLOTANTES_CLOUD = ", ".join([
+    '[class*="viewerBadge"]', '[class*="ViewerBadge"]', '[class*="_profileContainer_"]',
+    '[class*="_profilePreview_"]', 'a[href^="https://streamlit.io/cloud"]', 'a[href*="share.streamlit.io/user/"]',
+    'iframe[title="streamlit_badge"]', '.stAppViewerFooter', '[data-testid="manage-app-button"]',
+])
 
 # Regla amplia para widgets flotantes inferiores: solo se inyecta en la página contenedora de Streamlit Cloud
 # (donde viven esos badges). Dentro de la app podría ocultar avisos o ventanas emergentes propias.

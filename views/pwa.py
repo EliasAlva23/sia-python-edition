@@ -11,7 +11,7 @@ import json
 
 import streamlit as st
 
-from views.styles import AZUL_NOCHE, CSS_OCULTAR_CLOUD, CSS_SOLO_CONTENEDOR
+from views.styles import AZUL_NOCHE, CSS_OCULTAR_CLOUD, CSS_SOLO_CONTENEDOR, SELECTORES_FLOTANTES_CLOUD
 
 _SCRIPT = """
 <script>
@@ -39,11 +39,34 @@ _SCRIPT = """
     if (doc.documentElement) doc.documentElement.setAttribute("lang", "es");
   }
   function ocultarFlotantes(doc) {
-    if (!doc || !doc.head || doc.getElementById("sia-ocultar-cloud")) return;
-    var estilo = doc.createElement("style");
-    estilo.id = "sia-ocultar-cloud";
-    estilo.textContent = datos.cssOcultar;
-    doc.head.appendChild(estilo);
+    if (!doc || !doc.head) return;
+    function asegurarEstilo() {
+      if (doc.getElementById("sia-ocultar-cloud")) return;
+      var estilo = doc.createElement("style");
+      estilo.id = "sia-ocultar-cloud";
+      estilo.textContent = datos.cssOcultar;
+      doc.head.appendChild(estilo);
+    }
+    function ocultarEnLinea() {
+      // Refuerzo por si Cloud dibuja los botones después o con estilos en línea propios.
+      doc.querySelectorAll(datos.selectores).forEach(function (el) {
+        if (el.querySelector && el.querySelector("iframe:not([title='streamlit_badge'])")) return;  // nunca la app
+        el.style.setProperty("display", "none", "important");
+        el.style.setProperty("visibility", "hidden", "important");
+        el.style.setProperty("pointer-events", "none", "important");
+      });
+    }
+    asegurarEstilo();
+    ocultarEnLinea();
+    if (!doc.__siaObservador && doc.body && window.MutationObserver) {
+      var pendiente = false;
+      doc.__siaObservador = new MutationObserver(function () {
+        if (pendiente) return;
+        pendiente = true;
+        setTimeout(function () { pendiente = false; asegurarEstilo(); ocultarEnLinea(); }, 150);
+      });
+      doc.__siaObservador.observe(doc.documentElement, {childList: true, subtree: true});
+    }
   }
   // Documento de la app: el actual, o el padre si este script corre en el iframe de respaldo (srcdoc).
   var doc = document;
@@ -65,7 +88,12 @@ _SCRIPT = """
 
 
 def inyectar_pwa() -> None:
-    datos = {"color": AZUL_NOCHE, "titulo": "SIA IES 11", "cssOcultar": CSS_OCULTAR_CLOUD + CSS_SOLO_CONTENEDOR}
+    datos = {
+        "color": AZUL_NOCHE,
+        "titulo": "SIA IES 11",
+        "cssOcultar": CSS_OCULTAR_CLOUD + CSS_SOLO_CONTENEDOR,
+        "selectores": SELECTORES_FLOTANTES_CLOUD,
+    }
     script = _SCRIPT % {"datos": json.dumps(datos)}
     try:
         # Se ejecuta en la página principal (Streamlit 1.4x+).
