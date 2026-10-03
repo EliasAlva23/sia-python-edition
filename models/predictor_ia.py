@@ -124,10 +124,16 @@ class PredictorRiesgoIA:
             "etiquetas_docente": len(resultados or {}),
         }
         if len(X) < self.MIN_MUESTRAS or len(np.unique(y)) < 2:
-            info["motivo"] = (
-                f"Se necesitan al menos {self.MIN_MUESTRAS} instantáneas de historia con casos de ambas "
-                f"clases (hay {len(X)}). Mientras tanto se usa un puntaje heurístico."
-            )
+            if len(X) < self.MIN_MUESTRAS:
+                info["motivo"] = (
+                    f"Se necesitan al menos {self.MIN_MUESTRAS} instantáneas de historia (hay {len(X)}). "
+                    "Mientras tanto se usa un puntaje heurístico."
+                )
+            else:
+                info["motivo"] = (
+                    "Todos los alumnos tienen por ahora el mismo desenlace (todos regulares o todos en riesgo), "
+                    "así que no hay contraste para entrenar. Mientras tanto se usa un puntaje heurístico."
+                )
             self._modelo, self._info = None, info
             return dict(info)
 

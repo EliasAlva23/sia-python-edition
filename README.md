@@ -23,6 +23,27 @@ views/                      # auth, panel docente, panel alumno, estilos CSS
 requirements.txt / packages.txt
 ```
 
+## Identidad visual
+
+- **Logo ISE:** colocá el archivo oficial en `assets/logo_ise.png` (ver `assets/LEEME.md`). Se muestra en el
+  encabezado y en la barra lateral; mientras no exista se usa un distintivo provisorio "ISE".
+- **Modo claro / oscuro:** interruptor "🌙 Modo oscuro" en la barra lateral (se conserva al cerrar sesión).
+- **Responsive:** tarjetas en grilla CSS, columnas apiladas y pestañas desplazables en celulares.
+- Firma "Desarrollado por Tech Innovation Team" al pie de todas las pantallas.
+
+## Materias
+
+Cada materia exige **Curso / Comisión**, **Turno** (Mañana / Tarde / Noche) y **Día y horario**.
+Las bases creadas con la versión anterior se migran solas al iniciar (se agregan las columnas sin perder datos).
+
+## QR con enlace real
+
+Si la app tiene URL pública (`SIA_PUBLIC_URL` en Secrets, o detectada del navegador cuando no es localhost),
+los QR son enlaces: escaneados con la **cámara nativa del celular** abren la app y, tras iniciar sesión,
+inscriben al alumno (`?inscribir=<código>&f=<firma>`) o registran su presente (`?asistencia=<token>`).
+El token de asistencia se valida al abrir el enlace, así el alumno tiene hasta 10 minutos para iniciar sesión.
+En local, los QR contienen el código `SIA:` firmado y se leen con el escáner integrado de la app.
+
 ## Flujo
 
 | Acción | Quién | Cómo |

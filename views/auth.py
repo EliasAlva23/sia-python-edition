@@ -6,19 +6,26 @@ import time
 
 import streamlit as st
 
+from core import validaciones as val
 from core.security import config_valor
 from models.persona import Docente, Estudiante, Persona, RepositorioPersonas
-from views.styles import hero
+from views.styles import CLAVE_TEMA, hero, mostrar_errores
 
 MINUTOS_INACTIVIDAD = int(config_valor("SIA_SESSION_MINUTES", "30"))
 HORAS_MAXIMAS = 8
 _CLAVES_SESION = ("usuario_id", "usuario_rol", "login_ts", "ultima_actividad")
+# Se conservan al entrar/salir: preferencia de tema y acción QR escaneada antes de iniciar sesión.
+_CLAVES_PERSISTENTES = (CLAVE_TEMA, "accion_pendiente")
+
+
+def _limpiar_estado() -> None:
+    for clave in list(st.session_state.keys()):
+        if clave not in _CLAVES_PERSISTENTES:
+            del st.session_state[clave]
 
 
 def iniciar_sesion(persona: Persona) -> None:
-    # Limpiamos cualquier estado previo para no mezclar datos entre usuarios.
-    for clave in list(st.session_state.keys()):
-        del st.session_state[clave]
+    _limpiar_estado()  # evita mezclar datos entre usuarios
     ahora = time.time()
     st.session_state.update(
         usuario_id=persona.id, usuario_rol=persona.rol, login_ts=ahora, ultima_actividad=ahora
@@ -26,8 +33,8 @@ def iniciar_sesion(persona: Persona) -> None:
 
 
 def cerrar_sesion(motivo: str | None = None) -> None:
-    for clave in list(st.session_state.keys()):
-        del st.session_state[clave]
+    _limpiar_estado()
+    st.session_state.pop("accion_pendiente", None)
     if motivo:
         st.session_state["aviso_sesion"] = motivo
 
@@ -56,18 +63,16 @@ def usuario_actual() -> Persona | None:
     return persona
 
 
-def minutos_restantes() -> int:
-    restante = MINUTOS_INACTIVIDAD * 60 - (time.time() - st.session_state.get("ultima_actividad", 0))
-    return max(0, int(restante // 60))
-
-
 def render_acceso() -> None:
-    hero("SIA · Sistema de Asistencia Inteligente", "Python Edition — asistencia por QR, ciencia de datos e IA predictiva")
+    hero("SIA · Sistema de Asistencia Inteligente", "Instituto ISE — asistencia por QR, sábana digital y analítica predictiva")
     aviso = st.session_state.pop("aviso_sesion", None)
     if aviso:
         st.warning(aviso)
+    pendiente = st.session_state.get("accion_pendiente")
+    if pendiente:
+        st.info(f"📲 {pendiente['descripcion']} Iniciá sesión con tu cuenta de estudiante para completarlo.")
 
-    _, centro, _ = st.columns([1, 2, 1])
+    _, centro, _ = st.columns([1, 2.2, 1])
     with centro:
         tab_login, tab_registro = st.tabs(["🔐 Ingresar", "📝 Crear cuenta"])
         with tab_login:
@@ -78,16 +83,23 @@ def render_acceso() -> None:
 
 def _form_login() -> None:
     with st.form("form_login"):
-        identificador = st.text_input("DNI o email")
+        identificador = st.text_input("DNI o email", placeholder="Ej. 40111222 o nombre@ise.edu.ar")
         password = st.text_input("Contraseña", type="password")
         enviar = st.form_submit_button("Ingresar", type="primary", width="stretch")
-    if enviar:
-        persona, mensaje = RepositorioPersonas.autenticar(identificador, password)
-        if persona is None:
-            st.error(mensaje)
-        else:
-            iniciar_sesion(persona)
-            st.rerun()
+    if not enviar:
+        return
+    errores = val.requeridos({"DNI o email": identificador, "Contraseña": password})
+    if not errores and "@" not in identificador and (e := val.error_dni(identificador)):
+        errores.append(e)
+    if errores:
+        mostrar_errores(errores)
+        return
+    persona, mensaje = RepositorioPersonas.autenticar(val.limpiar(identificador), password)
+    if persona is None:
+        st.error(mensaje, icon="⛔")
+    else:
+        iniciar_sesion(persona)
+        st.rerun()
 
 
 def _form_registro() -> None:
@@ -95,40 +107,53 @@ def _form_registro() -> None:
     codigo_docente = config_valor("SIA_DOCENTE_CODE")
     with st.form("form_registro", clear_on_submit=False):
         c1, c2 = st.columns(2)
-        nombre = c1.text_input("Nombre")
-        apellido = c2.text_input("Apellido")
-        dni = c1.text_input("DNI", help="Solo números, sin puntos.")
-        email = c2.text_input("Email")
+        nombre = c1.text_input("Nombre *")
+        apellido = c2.text_input("Apellido *")
+        dni = c1.text_input("DNI *", help="Solo números, sin puntos.", max_chars=10)
+        email = c2.text_input("Email *", placeholder="nombre@dominio.com")
         if rol == "Estudiante":
-            extra = st.text_input("Legajo (opcional)")
+            extra = st.text_input("Legajo (opcional)", max_chars=30)
         else:
-            extra = st.text_input("Departamento / Área (opcional)")
+            extra = st.text_input("Departamento / Área (opcional)", max_chars=80)
         p1, p2 = st.columns(2)
-        password = p1.text_input("Contraseña", type="password", help="Mínimo 8 caracteres con letras y números.")
-        confirmar = p2.text_input("Repetir contraseña", type="password")
+        password = p1.text_input("Contraseña *", type="password", help="Mínimo 8 caracteres con letras y números.")
+        confirmar = p2.text_input("Repetir contraseña *", type="password")
         invitacion = ""
         if rol == "Docente" and codigo_docente:
-            invitacion = st.text_input("Código de alta docente", type="password",
-                                       help="Lo provee la institución.")
+            invitacion = st.text_input("Código de alta docente *", type="password", help="Lo provee la institución.")
         enviar = st.form_submit_button("Crear cuenta", type="primary", width="stretch")
 
     if not enviar:
         return
-    if password != confirmar:
-        st.error("Las contraseñas no coinciden.")
-        return
-    if rol == "Docente" and codigo_docente and not hmac.compare_digest(invitacion, codigo_docente):
-        st.error("Código de alta docente incorrecto.")
+    obligatorios = {"Nombre": nombre, "Apellido": apellido, "DNI": dni, "Email": email,
+                    "Contraseña": password, "Repetir contraseña": confirmar}
+    if rol == "Docente" and codigo_docente:
+        obligatorios["Código de alta docente"] = invitacion
+    errores = val.requeridos(obligatorios)
+    errores += [e for e in (
+        val.error_nombre(nombre, "Nombre"),
+        val.error_nombre(apellido, "Apellido"),
+        val.error_dni(dni),
+        val.error_email(email),
+    ) if e]
+    errores += val.largo_maximo({"Nombre": (nombre, 80), "Apellido": (apellido, 80)})
+    errores += val.errores_password(password, confirmar)
+    if (rol == "Docente" and codigo_docente and invitacion
+            and not hmac.compare_digest(invitacion.strip(), codigo_docente)):
+        errores.append("Código de alta docente incorrecto.")
+    if errores:
+        mostrar_errores(errores)
         return
     try:
+        datos = (dni, val.limpiar(nombre), val.limpiar(apellido), email.strip())
         if rol == "Docente":
-            persona: Persona = Docente(dni, nombre, apellido, email, departamento=extra)
+            persona: Persona = Docente(*datos, departamento=val.limpiar(extra))
         else:
-            persona = Estudiante(dni, nombre, apellido, email, legajo=extra)
+            persona = Estudiante(*datos, legajo=val.limpiar(extra))
         persona.establecer_password(password)
         RepositorioPersonas.registrar(persona)
     except ValueError as exc:
-        st.error(str(exc))
+        mostrar_errores([str(exc)])
         return
     iniciar_sesion(persona)
     st.rerun()
@@ -141,8 +166,11 @@ def render_cambio_password(persona: Persona) -> None:
             nueva = st.text_input("Nueva contraseña", type="password")
             repetir = st.text_input("Repetir nueva", type="password")
             if st.form_submit_button("Actualizar", width="stretch"):
-                if nueva != repetir:
-                    st.error("Las contraseñas no coinciden.")
+                errores = val.requeridos({"Contraseña actual": actual, "Nueva contraseña": nueva,
+                                          "Repetir nueva": repetir})
+                errores += val.errores_password(nueva, repetir)
+                if errores:
+                    mostrar_errores(errores)
                 else:
                     try:
                         RepositorioPersonas.cambiar_password(persona, actual, nueva)

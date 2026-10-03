@@ -13,7 +13,7 @@ from typing import Iterator
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = Path(os.environ.get("SIA_DB_PATH", BASE_DIR / "database.db"))
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 
 TABLAS = (
     "config",
@@ -50,6 +50,9 @@ CREATE TABLE IF NOT EXISTS materias (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     nombre       TEXT NOT NULL,
     descripcion  TEXT NOT NULL DEFAULT '',
+    curso        TEXT NOT NULL DEFAULT '',
+    turno        TEXT NOT NULL DEFAULT '',
+    dia_horario  TEXT NOT NULL DEFAULT '',
     docente_id   INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
     codigo_clase TEXT NOT NULL UNIQUE,
     umbral       REAL NOT NULL DEFAULT 75 CHECK (umbral BETWEEN 0 AND 100),
@@ -126,13 +129,33 @@ def get_connection() -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
+# Columnas agregadas en versiones posteriores: se crean en bases existentes sin perder datos.
+_MIGRACIONES = {
+    "materias": {
+        "curso": "TEXT NOT NULL DEFAULT ''",
+        "turno": "TEXT NOT NULL DEFAULT ''",
+        "dia_horario": "TEXT NOT NULL DEFAULT ''",
+    },
+}
+
+
+def _migrar(conn: sqlite3.Connection) -> None:
+    for tabla, columnas in _MIGRACIONES.items():
+        existentes = {f["name"] for f in conn.execute(f"PRAGMA table_info({tabla})")}
+        for columna, definicion in columnas.items():
+            if columna not in existentes:
+                conn.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {definicion}")
+
+
 def init_db() -> None:
-    """Crea las tablas e índices si no existen (idempotente)."""
+    """Crea las tablas e índices si no existen y aplica migraciones (idempotente)."""
     with get_connection() as conn:
         conn.execute("PRAGMA journal_mode = WAL")
         conn.executescript(SCHEMA)
+        _migrar(conn)
         conn.execute(
-            "INSERT OR IGNORE INTO config (clave, valor) VALUES ('schema_version', ?)",
+            """INSERT INTO config (clave, valor) VALUES ('schema_version', ?)
+               ON CONFLICT (clave) DO UPDATE SET valor = excluded.valor""",
             (SCHEMA_VERSION,),
         )
 

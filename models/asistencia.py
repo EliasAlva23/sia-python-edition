@@ -151,19 +151,27 @@ class RegistroAsistencia:
         return self.marcar(persona.id, metodo, docente_id, estado=estado, docente_id=docente_id)
 
     @staticmethod
-    def procesar_token_clase(token: str, estudiante: Persona) -> ResultadoMarcado:
-        """El alumno escanea el QR dinámico proyectado por el docente."""
+    def validar_token_clase(token: str) -> tuple[int | None, str | None]:
+        """Verifica firma HMAC y vigencia. Devuelve (clase_id, None) o (None, mensaje de error)."""
         partes = (token or "").strip().split(":")
         if len(partes) != 5 or partes[0].upper() != "SIA" or partes[1].upper() != "C":
-            return ResultadoMarcado(False, "error", "El código no es un QR de clase válido.")
+            return None, "El código no es un QR de clase válido."
         try:
             clase_id, ventana = int(partes[2]), int(partes[3])
         except ValueError:
-            return ResultadoMarcado(False, "error", "QR de clase mal formado.")
+            return None, "QR de clase mal formado."
         if not security.verificar_firma(f"SIA:C:{clase_id}:{ventana}", partes[4], 12):
-            return ResultadoMarcado(False, "error", "QR de clase adulterado.")
+            return None, "QR de clase adulterado."
         if ventana not in (_ventana(), _ventana() - 1):
-            return ResultadoMarcado(False, "error", "El QR expiró. Escaneá el código que se proyecta ahora.")
+            return None, "El QR expiró. Escaneá el código que se proyecta ahora."
+        return clase_id, None
+
+    @staticmethod
+    def procesar_token_clase(token: str, estudiante: Persona) -> ResultadoMarcado:
+        """El alumno escanea el QR dinámico proyectado por el docente."""
+        clase_id, error = RegistroAsistencia.validar_token_clase(token)
+        if error:
+            return ResultadoMarcado(False, "error", error)
         return RegistroAsistencia(clase_id).marcar(estudiante.id, "qr_clase", estudiante.id)
 
     @staticmethod

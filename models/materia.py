@@ -7,8 +7,10 @@ import sqlite3
 
 import pandas as pd
 
+from core import security
 from core.database import get_connection
 from core.tiempo import ahora_iso, hoy
+from core.validaciones import errores_materia, limpiar
 
 _ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 _CODIGO_RE = re.compile(r"^SIA-[A-Z0-9]{6}$")
@@ -27,8 +29,14 @@ class Materia:
         codigo_clase: str,
         umbral: float = 75.0,
         activa: bool = True,
+        curso: str = "",
+        turno: str = "",
+        dia_horario: str = "",
     ) -> None:
         self._id = id
+        self._curso = curso
+        self._turno = turno
+        self._dia_horario = dia_horario
         self._nombre = nombre
         self._descripcion = descripcion
         self._docente_id = docente_id
@@ -62,8 +70,33 @@ class Materia:
         return self._umbral
 
     @property
+    def curso(self) -> str:
+        return self._curso
+
+    @property
+    def turno(self) -> str:
+        return self._turno
+
+    @property
+    def dia_horario(self) -> str:
+        return self._dia_horario
+
+    @property
     def payload_inscripcion(self) -> str:
-        return f"{PREFIJO_INSCRIPCION}{self._codigo_clase}"
+        """SIA:ENROLL:<codigo>:<firma HMAC con SIA_SECRET>."""
+        base = f"{PREFIJO_INSCRIPCION}{self._codigo_clase}"
+        return f"{base}:{security.firmar(base, 12)}"
+
+    @property
+    def firma_inscripcion(self) -> str:
+        return security.firmar(f"{PREFIJO_INSCRIPCION}{self._codigo_clase}", 12)
+
+    @staticmethod
+    def verificar_payload_inscripcion(codigo: str, firma: str) -> bool:
+        codigo = (codigo or "").strip().upper()
+        return bool(_CODIGO_RE.match(codigo)) and security.verificar_firma(
+            f"{PREFIJO_INSCRIPCION}{codigo}", firma or "", 12
+        )
 
     def __eq__(self, otro: object) -> bool:
         return isinstance(otro, Materia) and otro.id == self._id
@@ -80,6 +113,7 @@ class Materia:
         return Materia(
             fila["id"], fila["nombre"], fila["descripcion"], fila["docente_id"],
             fila["codigo_clase"], fila["umbral"], fila["activa"],
+            fila["curso"], fila["turno"], fila["dia_horario"],
         )
 
     @staticmethod
@@ -93,28 +127,49 @@ class Materia:
     def normalizar_codigo(texto: str) -> str | None:
         t = (texto or "").strip().upper()
         if t.startswith(PREFIJO_INSCRIPCION):
-            t = t[len(PREFIJO_INSCRIPCION):]
+            # Formato firmado SIA:ENROLL:<codigo>:<firma>: la firma debe ser válida.
+            partes = t[len(PREFIJO_INSCRIPCION):].split(":")
+            if len(partes) == 2 and not Materia.verificar_payload_inscripcion(partes[0], partes[1]):
+                return None
+            t = partes[0]
         if not t.startswith("SIA-"):
             t = f"SIA-{t}"
         return t if _CODIGO_RE.match(t) else None
 
-    @classmethod
-    def crear(cls, nombre: str, descripcion: str, docente_id: int, umbral: float = 75.0) -> "Materia":
-        nombre = (nombre or "").strip()
-        if not nombre or len(nombre) > 120:
-            raise ValueError("El nombre de la materia es obligatorio (máx. 120 caracteres).")
+    @staticmethod
+    def _validar(nombre: str, curso: str, turno: str | None, dia_horario: str, umbral: float) -> None:
+        errores = errores_materia(nombre, curso, turno, dia_horario)
         if not 0 <= umbral <= 100:
-            raise ValueError("El umbral debe estar entre 0 y 100.")
+            errores.append("El umbral debe estar entre 0 y 100.")
+        if errores:
+            raise ValueError("\n".join(errores))
+
+    @classmethod
+    def crear(
+        cls,
+        nombre: str,
+        descripcion: str,
+        docente_id: int,
+        umbral: float = 75.0,
+        curso: str = "",
+        turno: str = "",
+        dia_horario: str = "",
+    ) -> "Materia":
+        cls._validar(nombre, curso, turno, dia_horario, umbral)
+        nombre, curso, dia_horario = limpiar(nombre, 120), limpiar(curso, 80), limpiar(dia_horario, 120)
+        descripcion = (descripcion or "").strip()[:500]
         for _ in range(10):
             codigo = cls._generar_codigo()
             try:
                 with get_connection() as conn:
                     cur = conn.execute(
-                        """INSERT INTO materias (nombre, descripcion, docente_id, codigo_clase, umbral, creado_en)
-                           VALUES (?, ?, ?, ?, ?, ?)""",
-                        (nombre, (descripcion or "").strip(), docente_id, codigo, umbral, ahora_iso()),
+                        """INSERT INTO materias (nombre, descripcion, curso, turno, dia_horario,
+                                                 docente_id, codigo_clase, umbral, creado_en)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (nombre, descripcion, curso, turno, dia_horario, docente_id, codigo, umbral, ahora_iso()),
                     )
-                return cls(cur.lastrowid, nombre, (descripcion or "").strip(), docente_id, codigo, umbral)
+                return cls(cur.lastrowid, nombre, descripcion, docente_id, codigo, umbral, True,
+                           curso, turno, dia_horario)
             except sqlite3.IntegrityError:
                 continue
         raise RuntimeError("No se pudo generar un código de clase único.")
@@ -155,13 +210,20 @@ class Materia:
         return [cls._desde_fila(f) for f in filas]
 
     # ----- gestión -----
-    def actualizar(self, nombre: str, descripcion: str, umbral: float) -> None:
+    def actualizar(
+        self, nombre: str, descripcion: str, umbral: float, curso: str, turno: str, dia_horario: str
+    ) -> None:
+        self._validar(nombre, curso, turno, dia_horario, umbral)
+        nombre, curso, dia_horario = limpiar(nombre, 120), limpiar(curso, 80), limpiar(dia_horario, 120)
+        descripcion = (descripcion or "").strip()[:500]
         with get_connection() as conn:
             conn.execute(
-                "UPDATE materias SET nombre = ?, descripcion = ?, umbral = ? WHERE id = ?",
-                (nombre.strip(), descripcion.strip(), umbral, self._id),
+                """UPDATE materias SET nombre = ?, descripcion = ?, umbral = ?, curso = ?, turno = ?,
+                                       dia_horario = ? WHERE id = ?""",
+                (nombre, descripcion, umbral, curso, turno, dia_horario, self._id),
             )
-        self._nombre, self._descripcion, self._umbral = nombre.strip(), descripcion.strip(), float(umbral)
+        self._nombre, self._descripcion, self._umbral = nombre, descripcion, float(umbral)
+        self._curso, self._turno, self._dia_horario = curso, turno, dia_horario
 
     def regenerar_codigo(self) -> str:
         for _ in range(10):
