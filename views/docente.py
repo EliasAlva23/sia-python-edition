@@ -19,7 +19,7 @@ from utils.qr import (
 )
 from views import auth
 from views.styles import (
-    COLORES_NIVEL, EMOJI_NIVEL, TONOS, alerta, chips, codigo, estilo_plotly, hero, kpi_grid, mostrar_errores,
+    COLORES_NIVEL, EMOJI_NIVEL, TONOS, alerta, aviso_camara, chips, codigo, estilo_plotly, hero, kpi_grid, mostrar_errores,
     tono_porcentaje,
 )
 
@@ -345,6 +345,8 @@ def _tab_lector(docente: Docente, materia: Materia) -> None:
         modo = st.radio("Modo", ["⌨️ Manual / lector USB", "📷 Cámara"], horizontal=True,
                         key=f"modo_lector_{clase['id']}", label_visibility="collapsed")
         if modo.startswith("📷"):
+            aviso_camara("📌 Si tu navegador solicita permisos, haz clic en 'Permitir' para activar la cámara. "
+                         "Si estás en iPhone/Android y no abre, usa el modo «Manual / lector USB» e ingresá el DNI.")
             foto = st.camera_input("Mostrá la credencial QR del alumno a la cámara", key=f"cam_doc_{clase['id']}")
             if foto is not None:
                 huella = hashlib.sha256(foto.getvalue()).hexdigest()

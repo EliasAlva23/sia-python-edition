@@ -15,7 +15,7 @@ from models.persona import Estudiante
 from models.predictor_ia import PredictorRiesgoIA
 from utils.qr import decodificar_qr, generar_qr_png, interpretar_codigo
 from views.styles import (
-    TONOS, alerta, chips, estilo_plotly, hero, kpi_grid, tarjeta_progreso, tono_porcentaje,
+    INSTITUCION_CORTA, TONOS, alerta, aviso_camara, chips, estilo_plotly, hero, kpi_grid, tarjeta_progreso, tono_porcentaje,
 )
 
 ICONOS_ESTADO = {"presente": "✅ Presente", "tarde": "🕒 Tarde", "justificado": "📝 Justificado", "ausente": "❌ Ausente"}
@@ -97,11 +97,22 @@ def _mostrar_resultado_guardado() -> None:
         st.error(f"⛔ {resultado.mensaje}")
 
 
-def _escaner(clave: str, etiqueta: str, estudiante: Estudiante) -> None:
+AVISO_CAMARA_PIN = (
+    "📌 Si tu navegador solicita permisos, haz clic en 'Permitir' para activar la cámara. "
+    "Si estás en iPhone/Android y no abre, usa la opción de PIN a la derecha."
+)
+AVISO_CAMARA_CODIGO = (
+    "📌 Si tu navegador solicita permisos, haz clic en 'Permitir' para activar la cámara. "
+    "Si estás en iPhone/Android y no abre, ingresá el código de la materia en el formulario de arriba."
+)
+
+
+def _escaner(clave: str, etiqueta: str, estudiante: Estudiante, aviso: str) -> None:
     """Cámara bajo demanda (evita abrir varias cámaras a la vez en el celular)."""
     if not st.toggle("📷 Activar cámara", key=f"activar_{clave}"):
         st.caption("Activá la cámara y sacá una foto nítida del QR (en el celular podés cambiar a la cámara trasera).")
         return
+    aviso_camara(aviso)
     foto = st.camera_input(etiqueta, key=f"cam_{clave}")
     if foto is None:
         return
@@ -145,7 +156,7 @@ def _tab_presente(estudiante: Estudiante, materias: list[Materia]) -> None:
         with st.container(border=True):
             st.markdown("##### 📷 Escanear QR de la clase")
             st.caption("También podés escanearlo con la cámara del celular: abre la app y registra tu presente.")
-            _escaner("presente", "Apuntá al QR que proyecta tu docente", estudiante)
+            _escaner("presente", "Apuntá al QR que proyecta tu docente", estudiante, AVISO_CAMARA_PIN)
     with col_pin:
         with st.form("form_pin", clear_on_submit=True):
             st.markdown("##### 🔢 ¿Falla la cámara? Ingresá el PIN")
@@ -176,7 +187,7 @@ def _tab_unirme(estudiante: Estudiante, materias: list[Materia]) -> None:
                     st.rerun()
         with st.container(border=True):
             st.markdown("##### 📷 o escaneá el QR de inscripción")
-            _escaner("unirme", "Apuntá al QR de inscripción", estudiante)
+            _escaner("unirme", "Apuntá al QR de inscripción", estudiante, AVISO_CAMARA_CODIGO)
     with col_lista:
         st.markdown("##### 📚 Mis materias")
         if not materias:
@@ -277,7 +288,7 @@ def _tab_credencial(estudiante: Estudiante) -> None:
         legajo = f" · Legajo <b>{escape(estudiante.legajo)}</b>" if estudiante.legajo else ""
         st.markdown(
             f'<div class="sia-card"><div class="muted" style="font-weight:700;letter-spacing:.08em">'
-            f'CREDENCIAL ESTUDIANTIL · ISE</div>'
+            f'CREDENCIAL ESTUDIANTIL · {escape(INSTITUCION_CORTA)}</div>'
             f'<div style="font-size:1.5rem;font-weight:800;margin:.3rem 0">{escape(estudiante.nombre_completo)}</div>'
             f'<div>DNI <b>{escape(estudiante.dni)}</b>{legajo}</div>'
             f'<div class="muted">{escape(estudiante.email)}</div></div>',

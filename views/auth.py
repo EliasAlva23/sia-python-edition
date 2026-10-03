@@ -9,7 +9,7 @@ import streamlit as st
 from core import validaciones as val
 from core.security import config_valor
 from models.persona import Docente, Estudiante, Persona, RepositorioPersonas
-from views.styles import CLAVE_TEMA, hero, mostrar_errores
+from views.styles import CLAVE_TEMA, INSTITUCION, TITULO_APP, hero, mostrar_errores
 
 MINUTOS_INACTIVIDAD = int(config_valor("SIA_SESSION_MINUTES", "30"))
 HORAS_MAXIMAS = 8
@@ -64,7 +64,8 @@ def usuario_actual() -> Persona | None:
 
 
 def render_acceso() -> None:
-    hero("SIA · Sistema de Asistencia Inteligente", "Instituto ISE — asistencia por QR, sábana digital y analítica predictiva")
+    hero(f"{TITULO_APP} · Sistema de Asistencia Inteligente",
+         f"{INSTITUCION} — asistencia por QR, sábana digital y analítica predictiva")
     aviso = st.session_state.pop("aviso_sesion", None)
     if aviso:
         st.warning(aviso)
@@ -83,7 +84,7 @@ def render_acceso() -> None:
 
 def _form_login() -> None:
     with st.form("form_login"):
-        identificador = st.text_input("DNI o email", placeholder="Ej. 40111222 o nombre@ise.edu.ar")
+        identificador = st.text_input("DNI o email", placeholder="Ej. 40111222 o nombre@correo.com")
         password = st.text_input("Contraseña", type="password")
         enviar = st.form_submit_button("Ingresar", type="primary", width="stretch")
     if not enviar:

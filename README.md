@@ -1,4 +1,6 @@
-# 🎓 SIA · Sistema de Asistencia Inteligente (Python Edition)
+# 🎓 SIA · IES N° 11 — Sistema de Asistencia Inteligente (Python Edition)
+
+Instituto de Educación Superior N° 11.
 
 Aplicación web en **Streamlit** para la relación Docente–Alumno: asistencia por QR,
 ciencia de datos con `pandas` + `plotly` y predicción de riesgo con **Random Forest** (`scikit-learn`).
@@ -25,8 +27,8 @@ requirements.txt / packages.txt
 
 ## Identidad visual
 
-- **Logo ISE:** colocá el archivo oficial en `assets/logo_ise.png` (ver `assets/LEEME.md`). Se muestra en el
-  encabezado y en la barra lateral; mientras no exista se usa un distintivo provisorio "ISE".
+- **Logo IES N° 11:** colocá el archivo oficial en `assets/logo_ise.png` (ver `assets/LEEME.md`). Se muestra en el
+  encabezado y en la barra lateral; mientras no exista se usa un distintivo provisorio "IES".
 - **Modo claro / oscuro:** interruptor "🌙 Modo oscuro" en la barra lateral (se conserva al cerrar sesión).
 - **Responsive:** tarjetas en grilla CSS, columnas apiladas y pestañas desplazables en celulares.
 - Firma "Desarrollado por Tech Innovation Team" al pie de todas las pantallas.

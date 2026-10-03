@@ -1,4 +1,4 @@
-"""Identidad visual ISE: tema claro/oscuro, tarjetas, botones, logo y componentes."""
+"""Identidad visual del IES N° 11: tema claro/oscuro, tarjetas, botones, logo y componentes."""
 from __future__ import annotations
 
 import base64
@@ -9,11 +9,19 @@ from pathlib import Path
 import streamlit as st
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
-_NOMBRES_LOGO = ("logo_ise.png", "logo_ise.svg", "logo_ise.webp", "logo_ise.jpg", "logo_ise.jpeg")
+# Se usa el primero que exista. `logo_ise.png` se mantiene por compatibilidad.
+_NOMBRES_LOGO = tuple(
+    f"{base}.{ext}" for base in ("logo_ise", "logo_ies", "logo_ies11") for ext in ("png", "svg", "webp", "jpg", "jpeg")
+)
 _MIME = {".png": "image/png", ".svg": "image/svg+xml", ".webp": "image/webp", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
 CLAVE_TEMA = "modo_oscuro"
 
-# Paleta corporativa ISE (azules y celestes)
+# Denominación oficial de la institución (usar siempre estas constantes)
+INSTITUCION = "Instituto de Educación Superior N° 11"
+INSTITUCION_CORTA = "IES N° 11"
+TITULO_APP = f"SIA · {INSTITUCION_CORTA}"
+
+# Paleta institucional (azules y celestes)
 TONOS = {
     "azul": "#0B5CAD",
     "celeste": "#1E9BD7",
@@ -45,18 +53,18 @@ _VARIABLES = {
   --sia-shadow-hover: 0 4px 10px rgba(11,92,173,.18), 0 14px 32px rgba(11,31,58,.12);
 """,
     "oscuro": """
-  --sia-bg: #0A1220;
-  --sia-bg-grad: radial-gradient(1200px 500px at 10% -10%, #10294A 0%, transparent 60%);
-  --sia-surface: #111C2F;
-  --sia-surface-2: #172640;
-  --sia-input: #0D1728;
-  --sia-ink: #E6EEF8;
-  --sia-muted: #9DB0C8;
-  --sia-border: rgba(120, 175, 235, 0.18);
-  --sia-primary: #3B9BFF;
-  --sia-primary-2: #4FC3F7;
-  --sia-primary-ink: #04121F;
-  --sia-accent-soft: #12304F;
+  --sia-bg: #0F172A;
+  --sia-bg-grad: radial-gradient(1200px 500px at 10% -10%, #172554 0%, transparent 60%);
+  --sia-surface: #1E293B;
+  --sia-surface-2: #273449;
+  --sia-input: #0F172A;
+  --sia-ink: #F1F5F9;
+  --sia-muted: #A9B8CC;
+  --sia-border: rgba(59, 130, 246, 0.35);
+  --sia-primary: #3B82F6;
+  --sia-primary-2: #38BDF8;
+  --sia-primary-ink: #FFFFFF;
+  --sia-accent-soft: #1E3A5F;
   --sia-shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
   --sia-shadow-hover: 0 4px 12px rgba(59,155,255,.25), 0 14px 32px rgba(0,0,0,.45);
 """,
@@ -199,7 +207,7 @@ hr {{ border-color: var(--sia-border) !important; }}
   background: #fff; border-radius: 14px; padding: 6px; }}
 .sia-logo-placeholder {{
   width: 64px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
-  background: #fff; color: #0B5CAD; font-weight: 900; font-size: 1.25rem; letter-spacing: .04em;
+  background: #fff; color: #0B5CAD !important; font-weight: 900; font-size: 1.25rem; letter-spacing: .04em;
   box-shadow: inset 0 0 0 3px #1E9BD7;
 }}
 .sia-brand {{ display: flex; align-items: center; gap: .75rem; margin-bottom: .6rem; }}
@@ -247,6 +255,13 @@ hr {{ border-color: var(--sia-border) !important; }}
 .sia-alerta span {{ color: var(--sia-muted); font-size: .88rem; }}
 .sia-barra {{ height: 8px; border-radius: 999px; background: var(--sia-surface-2); overflow: hidden; margin-top: .55rem; }}
 .sia-barra > div {{ height: 100%; border-radius: 999px; background: var(--tono); }}
+.sia-aviso-camara {{
+  background: var(--sia-accent-soft); color: var(--sia-ink); border: 1px solid var(--sia-border);
+  border-left: 5px solid var(--sia-primary); border-radius: 12px; padding: .75rem .95rem; margin: .4rem 0 .7rem;
+  font-size: .9rem; line-height: 1.45; overflow-wrap: anywhere;
+}}
+[data-testid="stCameraInput"] {{ overflow: hidden; max-width: 100%; }}
+[data-testid="stCameraInput"] video, [data-testid="stCameraInput"] img {{ max-width: 100%; height: auto; border-radius: 12px; }}
 .sia-footer {{
   margin-top: 2.5rem; padding: 1rem; text-align: center; color: var(--sia-muted); font-size: .85rem;
   border-top: 1px solid var(--sia-border);
@@ -282,14 +297,57 @@ hr {{ border-color: var(--sia-border) !important; }}
 """
 
 
+# Reglas que solo se inyectan en modo oscuro (contraste reforzado).
+_CSS_OSCURO = """
+<style>
+/* Botones secundarios / popovers (sidebar: Cambiar contraseña, Cerrar sesión): texto blanco y borde definido */
+button[kind^="secondary"], button[data-testid^="stBaseButton-secondary"], [data-testid="stPopoverButton"] {
+  color: #FFFFFF !important; background: rgba(59, 130, 246, 0.12) !important; border: 1px solid #3B82F6 !important;
+}
+button[kind^="secondary"] p, button[data-testid^="stBaseButton-secondary"] p, [data-testid="stPopoverButton"] p,
+button[kind^="secondary"] span, [data-testid="stPopoverButton"] span { color: #FFFFFF !important; }
+button[kind^="secondary"]:hover, button[data-testid^="stBaseButton-secondary"]:hover, [data-testid="stPopoverButton"]:hover {
+  background: rgba(59, 130, 246, 0.28) !important; border-color: #60A5FA !important;
+}
+button[data-testid="stBaseButton-elementToolbar"] { background: transparent !important; border: none !important; }
+.sia-badge { color: #FFFFFF !important; border: 1px solid #3B82F6; box-shadow: 0 0 0 1px rgba(59,130,246,.25); }
+section[data-testid="stSidebar"] { background: #0F172A !important; }
+section[data-testid="stSidebar"] .sia-card { background: #1E293B; border-color: rgba(59,130,246,.35); }
+
+/* Tablas (st.dataframe / st.data_editor): se dibujan en <canvas> con los colores del tema base, que el CSS
+   no puede repintar. Un filtro invierte la luminosidad y conserva el tono: celdas oscuras y texto claro. */
+[data-testid="stDataFrame"], [data-testid="stDataEditor"] {
+  filter: invert(0.9) hue-rotate(180deg) saturate(1.15);
+  border-color: rgba(147, 197, 253, 0.6) !important;
+  background: #F2F6FB;
+}
+[data-testid="stTable"] table, [data-testid="stTable"] th, [data-testid="stTable"] td {
+  background: #1E293B !important; color: #E2E8F0 !important; border-color: rgba(59,130,246,.25) !important;
+}
+
+/* Cámara */
+[data-testid="stCameraInput"] { background: #1E293B !important; }
+[data-testid="stCameraInput"] * { color: #E2E8F0; }
+[data-testid="stCameraInput"] video, [data-testid="stCameraInput"] img { border-radius: 12px; }
+[data-testid="stCameraInput"] button { color: #FFFFFF !important; background: rgba(59,130,246,.18) !important; border: 1px solid #3B82F6 !important; }
+
+/* Alertas legibles sobre fondo oscuro */
+[data-testid="stAlertContainer"] { background: #1E293B !important; border: 1px solid rgba(59,130,246,.35) !important; }
+[data-testid="stAlertContainer"] p, [data-testid="stAlertContainer"] li { color: #E2E8F0 !important; }
+[data-testid="stCode"] pre, [data-testid="stCode"] code { background: #0F172A !important; color: #E2E8F0 !important; }
+</style>
+"""
+
+
 # ---------------------------------------------------------------- tema
 def modo_oscuro() -> bool:
     return bool(st.session_state.get(CLAVE_TEMA, False))
 
 
 def inyectar_css() -> None:
-    variables = _VARIABLES["oscuro" if modo_oscuro() else "claro"]
-    st.markdown(_CSS.format(variables=variables), unsafe_allow_html=True)
+    oscuro = modo_oscuro()
+    css = _CSS.format(variables=_VARIABLES["oscuro" if oscuro else "claro"])
+    st.markdown(css + (_CSS_OSCURO if oscuro else ""), unsafe_allow_html=True)
 
 
 def selector_tema() -> None:
@@ -316,29 +374,35 @@ def _logo_data_uri() -> str | None:
 def logo_html() -> str:
     uri = _logo_data_uri()
     if uri:
-        return f'<div class="sia-logo"><img src="{uri}" alt="Logo ISE"></div>'
-    return '<div class="sia-logo"><div class="sia-logo-placeholder" title="Agregá assets/logo_ise.png">ISE</div></div>'
+        return f'<div class="sia-logo"><img src="{uri}" alt="Logo {INSTITUCION_CORTA}"></div>'
+    return (f'<div class="sia-logo"><div class="sia-logo-placeholder" title="{INSTITUCION} — agregá '
+            f'assets/logo_ise.png para mostrar el logo oficial">IES</div></div>')
 
 
 def marca_sidebar() -> None:
     st.markdown(
-        f'<div class="sia-brand">{logo_html()}<div><b>SIA · ISE</b>'
-        f"<small>Sistema de Asistencia Inteligente</small></div></div>",
+        f'<div class="sia-brand">{logo_html()}<div><b>{_html(TITULO_APP)}</b>'
+        f"<small>Sistema de Asistencia Inteligente<br>{_html(INSTITUCION)}</small></div></div>",
         unsafe_allow_html=True,
     )
 
 
 # ---------------------------------------------------------------- componentes
+def _html(texto: str) -> str:
+    """Escapa y evita que "N° 11" se parta en dos líneas."""
+    return escape(texto).replace("N° ", "N°&nbsp;")
+
+
 def hero(titulo: str, subtitulo: str = "") -> None:
     st.markdown(
-        f'<div class="sia-hero">{logo_html()}<div><h1>{escape(titulo)}</h1><p>{escape(subtitulo)}</p></div></div>',
+        f'<div class="sia-hero">{logo_html()}<div><h1>{_html(titulo)}</h1><p>{_html(subtitulo)}</p></div></div>',
         unsafe_allow_html=True,
     )
 
 
 def footer() -> None:
     st.markdown(
-        '<div class="sia-footer">SIA · Instituto ISE — Desarrollado por <b>Tech Innovation Team</b></div>',
+        f'<div class="sia-footer">{_html(TITULO_APP)} · {_html(INSTITUCION)} — Desarrollado por <b>Tech Innovation Team</b></div>',
         unsafe_allow_html=True,
     )
 
@@ -390,6 +454,11 @@ def codigo(texto: str, grande: bool = False) -> None:
     st.markdown(f'<div class="{clase}">{escape(texto)}</div>', unsafe_allow_html=True)
 
 
+def aviso_camara(texto: str) -> None:
+    """Ayuda en español sobre el permiso de cámara (el componente de Streamlit muestra textos en inglés)."""
+    st.markdown(f'<div class="sia-aviso-camara">{escape(texto)}</div>', unsafe_allow_html=True)
+
+
 def mostrar_errores(errores: list[str]) -> None:
     st.error("**Revisá el formulario:**\n" + "\n".join(f"- {e}" for e in errores), icon="⚠️")
 
@@ -404,8 +473,9 @@ def tono_porcentaje(pct: float, umbral: float) -> str:
 
 def estilo_plotly(fig, alto: int = 360):
     oscuro = modo_oscuro()
-    texto = "#E6EEF8" if oscuro else "#0B1F3A"
-    grilla = "rgba(157,176,200,.18)" if oscuro else "rgba(11,31,58,.08)"
+    texto = "#E2E8F0" if oscuro else "#0B1F3A"
+    grilla = "rgba(148,163,184,.22)" if oscuro else "rgba(11,31,58,.08)"
+    linea = "rgba(148,163,184,.45)" if oscuro else "rgba(11,31,58,.25)"
     fig.update_layout(
         template="plotly_dark" if oscuro else "plotly_white",
         paper_bgcolor="rgba(0,0,0,0)",
@@ -413,10 +483,17 @@ def estilo_plotly(fig, alto: int = 360):
         height=alto,
         margin=dict(l=10, r=10, t=48, b=10),
         font=dict(family="Inter, system-ui, sans-serif", size=13, color=texto),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+                    font=dict(color=texto), title=dict(font=dict(color=texto)), bgcolor="rgba(0,0,0,0)"),
         title_font=dict(size=15, color=texto),
-        colorway=["#0B5CAD", "#1E9BD7", "#4FC3F7", "#0E9F6E", "#D98E04", "#7C8DB5"],
+        hoverlabel=dict(bgcolor="#1E293B" if oscuro else "#FFFFFF", font=dict(color=texto)),
+        colorway=["#3B82F6", "#38BDF8", "#7DD3FC", "#10B981", "#F59E0B", "#A5B4FC"] if oscuro
+        else ["#0B5CAD", "#1E9BD7", "#4FC3F7", "#0E9F6E", "#D98E04", "#7C8DB5"],
     )
-    fig.update_xaxes(gridcolor=grilla, zerolinecolor=grilla)
-    fig.update_yaxes(gridcolor=grilla, zerolinecolor=grilla)
+    ejes = dict(gridcolor=grilla, zerolinecolor=grilla, linecolor=linea,
+                tickfont=dict(color=texto), title_font=dict(color=texto))
+    fig.update_xaxes(**ejes)
+    fig.update_yaxes(**ejes)
+    fig.update_annotations(font_color=texto)
+    fig.update_coloraxes(colorbar_tickfont_color=texto, colorbar_title_font_color=texto)
     return fig

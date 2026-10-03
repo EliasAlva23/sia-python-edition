@@ -1,4 +1,4 @@
-"""SIA Python Edition (Instituto ISE) — punto de entrada de Streamlit.
+"""SIA Python Edition (Instituto de Educación Superior N° 11) — punto de entrada de Streamlit.
 
 Ejecutar:  streamlit run app.py
 """
@@ -9,8 +9,10 @@ from html import escape
 
 import streamlit as st
 
+from views.styles import TITULO_APP
+
 st.set_page_config(
-    page_title="SIA · ISE · Asistencia Inteligente",
+    page_title=f"{TITULO_APP} · Asistencia Inteligente",
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="auto",
