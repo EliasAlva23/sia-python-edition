@@ -11,7 +11,7 @@ import json
 
 import streamlit as st
 
-from views.styles import AZUL_NOCHE, CSS_OCULTAR_CLOUD
+from views.styles import AZUL_NOCHE, CSS_OCULTAR_CLOUD, CSS_SOLO_CONTENEDOR
 
 _SCRIPT = """
 <script>
@@ -65,7 +65,7 @@ _SCRIPT = """
 
 
 def inyectar_pwa() -> None:
-    datos = {"color": AZUL_NOCHE, "titulo": "SIA IES 11", "cssOcultar": CSS_OCULTAR_CLOUD}
+    datos = {"color": AZUL_NOCHE, "titulo": "SIA IES 11", "cssOcultar": CSS_OCULTAR_CLOUD + CSS_SOLO_CONTENEDOR}
     script = _SCRIPT % {"datos": json.dumps(datos)}
     try:
         # Se ejecuta en la página principal (Streamlit 1.4x+).

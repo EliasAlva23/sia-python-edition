@@ -108,23 +108,19 @@ h1, h2, h3, h4 {{ letter-spacing: -0.015em; font-weight: 800 !important; }}
 .stApp, [data-testid="stAppViewContainer"] {{
   background: var(--sia-bg-grad), var(--sia-bg) !important; color: var(--sia-ink);
 }}
-/* ---------- Encabezado nativo y barra lateral de Streamlit: ocultos por completo ----------
-   Los controles que antes vivían en la barra lateral (tema, materia activa, contraseña, cerrar sesión) están
-   en la barra superior propia (menú ☰), así que ocultar el encabezado no deja a nadie sin acceso en celulares. */
-header[data-testid="stHeader"], [data-testid="stHeader"], #MainMenu, footer, .stAppViewerFooter {{
-  display: none !important; visibility: hidden !important; height: 0 !important;
+/* ---------- Encabezado nativo oculto (menú ⋮, Share, GitHub, Deploy) ----------
+   Se usa `visibility` y no `display: none` porque el botón que abre la barra lateral en celulares
+   (stExpandSidebarButton) vive dentro de este encabezado: con display:none quedaría inaccesible y no se
+   podría cerrar sesión ni cambiar el tema desde el teléfono. visibility:hidden oculta y desactiva todo,
+   y el botón de la barra lateral se vuelve a mostrar explícitamente. */
+header[data-testid="stHeader"] {{ visibility: hidden !important; background: transparent !important; box-shadow: none !important; }}
+#MainMenu {{ visibility: hidden !important; }}
+[data-testid="stExpandSidebarButton"] {{
+  visibility: visible !important; color: #FFFFFF !important; border-radius: 14px !important;
+  background: linear-gradient(135deg, var(--sia-primary), var(--sia-primary-2)) !important;
+  box-shadow: var(--sia-shadow) !important;
 }}
-section[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [data-testid="stExpandSidebarButton"] {{
-  display: none !important;
-}}
-/* Barra superior propia (st.container key="sia_barra") */
-.st-key-sia_barra {{
-  background: var(--sia-surface); border: 1px solid var(--sia-border); border-radius: 18px;
-  padding: .45rem .6rem .45rem 1rem; box-shadow: var(--sia-shadow); margin-bottom: .9rem;
-}}
-.sia-usuario {{ display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; color: var(--sia-ink); }}
-.sia-usuario b {{ font-size: 1rem; }}
-.sia-usuario .sia-muted {{ font-size: .82rem; }}
+[data-testid="stExpandSidebarButton"] * {{ color: #FFFFFF !important; }}
 .block-container {{ padding-top: 1.4rem; padding-bottom: 2.5rem; max-width: 1400px; }}
 section[data-testid="stSidebar"] {{ background: var(--sia-surface) !important; border-right: 1px solid var(--sia-border); }}
 section[data-testid="stSidebar"] * {{ color: var(--sia-ink); }}
@@ -410,19 +406,13 @@ button[data-testid="stBaseButton-elementToolbar"] {{ background: transparent !im
 # Elementos flotantes de Streamlit / Streamlit Cloud (Manage app, distintivo "Hosted with Streamlit",
 # estado de ejecución, decoración superior). Se inyecta en la app y, por el script PWA, también en la página
 # contenedora de Streamlit Cloud, que es donde vive el botón "Manage app" (el CSS de la app no llega ahí).
+# stToolbar NO va con display:none: contiene el botón que abre la barra lateral en celulares; ya queda oculto
+# con visibility:hidden (heredado del encabezado) y ese botón se rescata con visibility:visible.
 CSS_OCULTAR_CLOUD = """
-header[data-testid="stHeader"],
-[data-testid="stHeader"],
-#MainMenu,
+.stAppViewerFooter,
 footer,
-.stAppViewerFooter {
-  display: none !important;
-  visibility: hidden !important;
-  height: 0 !important;
-}
 [data-testid="stStatusWidget"],
 [data-testid="stDecoration"],
-[data-testid="stToolbar"],
 [data-testid="stToolbarActions"],
 [data-testid="stMainMenu"],
 [data-testid="stAppDeployButton"],
@@ -430,9 +420,23 @@ footer,
 .stDeployButton,
 div[class*="viewerBadge"],
 div[class*="styles_viewerBadge"],
-iframe[title="streamlit_badge"],
-.stActionButton,
-div[data-testid="stActionButton"] {
+iframe[title="streamlit_badge"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+/* stToolbar: oculto con visibility (no display:none) porque contiene el botón ">>" que abre la barra lateral
+   en celulares; ese botón se vuelve a mostrar explícitamente. */
+[data-testid="stToolbar"] { visibility: hidden !important; }
+[data-testid="stExpandSidebarButton"] { visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; }
+"""
+
+# Regla amplia para widgets flotantes inferiores: solo se inyecta en la página contenedora de Streamlit Cloud
+# (donde viven esos badges). Dentro de la app podría ocultar avisos o ventanas emergentes propias.
+# Salvaguarda: nunca oculta un contenedor que incluya otro iframe que no sea el badge (p. ej. la app misma).
+CSS_SOLO_CONTENEDOR = """
+div[style*="position: fixed"][style*="bottom"]:not(:has(iframe:not([title="streamlit_badge"]))) {
   display: none !important;
   visibility: hidden !important;
   opacity: 0 !important;
@@ -506,6 +510,14 @@ def logo_tech_html() -> str:
     if uri:
         return f'<img src="{uri}" alt="Logo {EQUIPO}">'
     return f'<span class="sia-tech-placeholder" title="Agregá assets/logo_tech.png">TI</span>'
+
+
+def marca_sidebar() -> None:
+    st.markdown(
+        f'<div class="sia-brand">{logo_html()}<div><b>{_html(TITULO_APP)}</b>'
+        f"<small>Sistema de Asistencia Inteligente<br>{_html(INSTITUCION)}</small></div></div>",
+        unsafe_allow_html=True,
+    )
 
 
 # ---------------------------------------------------------------- componentes

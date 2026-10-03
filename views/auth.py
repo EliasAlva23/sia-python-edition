@@ -177,8 +177,7 @@ def _form_registro() -> None:
 
 
 def render_cambio_password(persona: Persona) -> None:
-    # Desplegable (no popover): se muestra dentro del menú ☰, y Streamlit no permite un popover dentro de otro.
-    with st.expander("🔑 Cambiar contraseña"):
+    with st.popover("🔑 Cambiar contraseña", width="stretch"):
         with st.form("form_cambio_pw", clear_on_submit=True):
             actual = st.text_input("Contraseña actual", type="password")
             nueva = st.text_input("Nueva contraseña", type="password")
