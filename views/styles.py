@@ -1,7 +1,8 @@
-"""Identidad visual del IES N° 11: tema claro/oscuro, tarjetas, botones, logo y componentes."""
+"""Identidad visual del IES N° 11: paleta, tipografía, tema claro/oscuro, logos y componentes."""
 from __future__ import annotations
 
 import base64
+import io
 from functools import lru_cache
 from html import escape
 from pathlib import Path
@@ -9,10 +10,10 @@ from pathlib import Path
 import streamlit as st
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
-# Se usa el primero que exista. `logo_ise.png` se mantiene por compatibilidad.
-_NOMBRES_LOGO = tuple(
-    f"{base}.{ext}" for base in ("logo_ise", "logo_ies", "logo_ies11") for ext in ("png", "svg", "webp", "jpg", "jpeg")
-)
+_EXTENSIONES = ("png", "webp", "jpg", "jpeg", "svg")
+# Se usa el primero que exista (logo_ise.* se mantiene por compatibilidad con versiones anteriores).
+_NOMBRES_LOGO_IES = tuple(f"{b}.{e}" for b in ("logo_ies", "logo_ies11", "logo_ise") for e in _EXTENSIONES)
+_NOMBRES_LOGO_TECH = tuple(f"logo_tech.{e}" for e in _EXTENSIONES)
 _MIME = {".png": "image/png", ".svg": "image/svg+xml", ".webp": "image/webp", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
 CLAVE_TEMA = "modo_oscuro"
 
@@ -20,59 +21,88 @@ CLAVE_TEMA = "modo_oscuro"
 INSTITUCION = "Instituto de Educación Superior N° 11"
 INSTITUCION_CORTA = "IES N° 11"
 TITULO_APP = f"SIA · {INSTITUCION_CORTA}"
+EQUIPO = "Tech Innovation Team"
 
-# Paleta institucional (azules y celestes)
+# Paleta institucional
+LILA = "#B78FB6"      # acentos y destacados
+LAVANDA = "#7979B1"   # elementos secundarios / hover
+AZUL = "#346FB0"      # botones primarios y bordes
+AZUL_OSCURO = "#02447B"  # tarjetas en modo oscuro
+AZUL_NOCHE = "#003467"   # fondo principal en modo oscuro
+
 TONOS = {
-    "azul": "#0B5CAD",
-    "celeste": "#1E9BD7",
-    "verde": "#0E9F6E",
-    "ambar": "#D98E04",
-    "rojo": "#D93B3B",
-    "gris": "#64748B",
-    "indigo": "#0B5CAD",
-    "cian": "#1E9BD7",
+    "azul": AZUL,
+    "lavanda": LAVANDA,
+    "lila": LILA,
+    "noche": AZUL_OSCURO,
+    "verde": "#2E9E77",
+    "ambar": "#D99A2B",
+    "rojo": "#D9534F",
+    "gris": "#6B7894",
+    # alias usados en vistas anteriores
+    "celeste": LAVANDA,
+    "indigo": AZUL,
+    "cian": LAVANDA,
 }
-COLORES_NIVEL = {"ALTO": "#D93B3B", "MEDIO": "#D98E04", "BAJO": "#0E9F6E"}
+COLORES_NIVEL = {"ALTO": "#D9534F", "MEDIO": "#D99A2B", "BAJO": "#2E9E77"}
 EMOJI_NIVEL = {"ALTO": "🔴", "MEDIO": "🟡", "BAJO": "🟢"}
+FUENTE = "'Plus Jakarta Sans', 'Inter', 'Nunito', system-ui, sans-serif"
 
 _VARIABLES = {
-    "claro": """
-  --sia-bg: #F2F6FB;
-  --sia-bg-grad: radial-gradient(1200px 500px at 10% -10%, #DCEBFA 0%, transparent 60%);
+    "claro": f"""
+  --sia-bg: #F6F7FC;
+  --sia-bg-grad: radial-gradient(1100px 480px at 0% -10%, rgba(183,143,182,.20) 0%, transparent 60%),
+                 radial-gradient(900px 420px at 100% 0%, rgba(52,111,176,.12) 0%, transparent 60%);
   --sia-surface: #FFFFFF;
-  --sia-surface-2: #EAF2FB;
+  --sia-surface-2: #EEF0FA;
   --sia-input: #FFFFFF;
-  --sia-ink: #0B1F3A;
-  --sia-muted: #5B6B82;
-  --sia-border: rgba(11, 92, 173, 0.14);
-  --sia-primary: #0B5CAD;
-  --sia-primary-2: #1E9BD7;
+  --sia-ink: #0E2747;
+  --sia-muted: #56658A;
+  --sia-border: rgba(121, 121, 177, 0.45);
+  --sia-border-strong: {AZUL};
+  --sia-primary: {AZUL};
+  --sia-primary-2: {LAVANDA};
+  --sia-accent: {LILA};
   --sia-primary-ink: #FFFFFF;
-  --sia-accent-soft: #E3F1FC;
-  --sia-shadow: 0 1px 2px rgba(11,31,58,.06), 0 8px 24px rgba(11,31,58,.08);
-  --sia-shadow-hover: 0 4px 10px rgba(11,92,173,.18), 0 14px 32px rgba(11,31,58,.12);
+  --sia-accent-soft: #F3ECF4;
+  --sia-tab-activa: linear-gradient(135deg, {AZUL} 0%, {LAVANDA} 100%);
+  --sia-shadow: 0 1px 3px rgba(2,68,123,.08), 0 10px 26px rgba(52,111,176,.10);
+  --sia-shadow-hover: 0 6px 14px rgba(52,111,176,.20), 0 16px 34px rgba(121,121,177,.18);
 """,
-    "oscuro": """
-  --sia-bg: #0F172A;
-  --sia-bg-grad: radial-gradient(1200px 500px at 10% -10%, #172554 0%, transparent 60%);
-  --sia-surface: #1E293B;
-  --sia-surface-2: #273449;
-  --sia-input: #0F172A;
-  --sia-ink: #F1F5F9;
-  --sia-muted: #A9B8CC;
-  --sia-border: rgba(59, 130, 246, 0.35);
-  --sia-primary: #3B82F6;
-  --sia-primary-2: #38BDF8;
+    "oscuro": f"""
+  --sia-bg: {AZUL_NOCHE};
+  --sia-bg-grad: radial-gradient(1100px 480px at 0% -10%, rgba(183,143,182,.22) 0%, transparent 60%),
+                 radial-gradient(900px 420px at 100% 0%, rgba(121,121,177,.20) 0%, transparent 60%);
+  --sia-surface: {AZUL_OSCURO};
+  --sia-surface-2: #0B4F8C;
+  --sia-input: #002B57;
+  --sia-ink: #F4F7FC;
+  --sia-muted: #C9D4EA;
+  --sia-border: rgba(121, 121, 177, 0.70);
+  --sia-border-strong: {LAVANDA};
+  --sia-primary: {AZUL};
+  --sia-primary-2: {LAVANDA};
+  --sia-accent: {LILA};
   --sia-primary-ink: #FFFFFF;
-  --sia-accent-soft: #1E3A5F;
-  --sia-shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
-  --sia-shadow-hover: 0 4px 12px rgba(59,155,255,.25), 0 14px 32px rgba(0,0,0,.45);
+  --sia-accent-soft: rgba(183, 143, 182, 0.22);
+  --sia-tab-activa: linear-gradient(135deg, {LILA} 0%, {LAVANDA} 100%);
+  --sia-shadow: 0 1px 3px rgba(0,0,0,.35), 0 10px 26px rgba(0,20,45,.45);
+  --sia-shadow-hover: 0 6px 16px rgba(183,143,182,.28), 0 16px 34px rgba(0,20,45,.55);
 """,
 }
 
 _CSS = """
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap');
 :root, .stApp {{ {variables} }}
+
+/* ---------- Tipografía (sin tocar los íconos Material de Streamlit) ---------- */
+html, body, .stApp, .stApp p, .stApp li, .stApp label, .stApp input, .stApp textarea, .stApp button,
+.stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp td, .stApp th, .stApp small,
+[data-testid="stMarkdownContainer"], [data-testid="stWidgetLabel"], [role="tab"], [role="option"] {{
+  font-family: {fuente} !important;
+}}
+h1, h2, h3, h4 {{ letter-spacing: -0.015em; font-weight: 800 !important; }}
 
 /* ---------- Base ---------- */
 .stApp, [data-testid="stAppViewContainer"] {{
@@ -91,7 +121,6 @@ section[data-testid="stSidebar"] * {{ color: var(--sia-ink); }}
   color: var(--sia-ink);
 }}
 [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p {{ color: var(--sia-muted) !important; }}
-h1, h2, h3, h4 {{ letter-spacing: -0.01em; }}
 [data-testid="stMarkdownContainer"] a {{ color: var(--sia-primary); }}
 
 /* ---------- Inputs ---------- */
@@ -100,59 +129,54 @@ h1, h2, h3, h4 {{ letter-spacing: -0.01em; }}
 [data-testid="stSelectbox"] [role="group"], [data-testid="stMultiSelect"] [role="group"],
 div:has(> input[role="combobox"]),
 [data-baseweb="input"], [data-baseweb="base-input"], [data-baseweb="textarea"], [data-baseweb="select"] > div {{
-  background: var(--sia-input) !important; border-color: var(--sia-border) !important; border-radius: 12px !important;
+  background: var(--sia-input) !important; border: 1px solid var(--sia-border) !important; border-radius: 12px !important;
 }}
 [data-testid="stTextInputRootElement"] input, [data-testid="stTextAreaRootElement"] textarea,
 [data-testid="stNumberInputContainer"] input, input[role="combobox"],
 [data-testid="stSelectbox"] [role="group"] div, [data-testid="stMultiSelect"] [role="group"] div,
 [data-baseweb="input"] input, [data-baseweb="textarea"] textarea, [data-baseweb="select"] div {{
   color: var(--sia-ink) !important; -webkit-text-fill-color: var(--sia-ink) !important; background-color: transparent !important;
+  border: none !important;
 }}
 [data-testid="stSelectbox"] svg, [data-testid="stMultiSelect"] svg {{ fill: var(--sia-muted); color: var(--sia-muted); }}
 [role="listbox"], [role="listbox"] [role="option"] {{ background: var(--sia-surface) !important; color: var(--sia-ink) !important; }}
 [role="listbox"] [role="option"]:hover, [role="listbox"] [aria-selected="true"] {{ background: var(--sia-surface-2) !important; }}
 [data-testid="stCheckbox"] label > div:first-child {{ background-color: var(--sia-input); border-color: var(--sia-border); }}
 [data-testid="stTextInputRootElement"]:focus-within, [data-testid="stTextAreaRootElement"]:focus-within,
-[data-testid="stSelectbox"] [role="group"]:focus-within {{
-  border-color: var(--sia-primary) !important;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sia-primary) 25%, transparent) !important;
+[data-testid="stSelectbox"] [role="group"]:focus-within, [data-baseweb="input"]:focus-within {{
+  border-color: var(--sia-border-strong) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sia-accent) 35%, transparent) !important;
 }}
-input::placeholder, textarea::placeholder {{ color: var(--sia-muted) !important; -webkit-text-fill-color: var(--sia-muted) !important; }}
-[data-baseweb="input"]:focus-within, [data-baseweb="textarea"]:focus-within, [data-baseweb="select"] > div:focus-within {{
-  border-color: var(--sia-primary) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--sia-primary) 25%, transparent) !important;
-}}
-[data-baseweb="popover"] ul, [data-baseweb="menu"], [data-baseweb="popover"] li {{
-  background: var(--sia-surface) !important; color: var(--sia-ink) !important;
-}}
-[data-baseweb="popover"] li:hover {{ background: var(--sia-surface-2) !important; }}
-[data-baseweb="tag"] {{ background: var(--sia-accent-soft) !important; border-radius: 8px !important; }}
+input::placeholder, textarea::placeholder {{ color: var(--sia-muted) !important; -webkit-text-fill-color: var(--sia-muted) !important; opacity: .8; }}
+[data-baseweb="tag"] {{ background: var(--sia-accent-soft) !important; border-radius: 10px !important; }}
 [data-baseweb="tag"] span {{ color: var(--sia-ink) !important; }}
 
 /* ---------- Botones ---------- */
-.stButton > button, .stDownloadButton > button, .stFormSubmitButton > button,
-[data-testid="stPopover"] > div > button, [data-testid="stPopoverButton"] {{
-  border-radius: 12px !important; font-weight: 600 !important; padding: .5rem 1.1rem !important;
-  transition: transform .15s ease, box-shadow .15s ease !important;
+.stButton > button, .stDownloadButton > button, .stFormSubmitButton > button, [data-testid="stPopoverButton"] {{
+  border-radius: 14px !important; font-weight: 700 !important; padding: .55rem 1.15rem !important;
+  box-shadow: var(--sia-shadow); transition: transform .15s ease, box-shadow .15s ease !important;
 }}
 button[kind^="primary"], button[data-testid^="stBaseButton-primary"] {{
   background: linear-gradient(135deg, var(--sia-primary) 0%, var(--sia-primary-2) 100%) !important;
-  color: var(--sia-primary-ink) !important; border: none !important; box-shadow: var(--sia-shadow);
+  color: var(--sia-primary-ink) !important; border: none !important;
 }}
 button[kind^="primary"] p, button[data-testid^="stBaseButton-primary"] p {{ color: var(--sia-primary-ink) !important; }}
 button[kind^="secondary"], button[data-testid^="stBaseButton-secondary"], [data-testid="stPopoverButton"] {{
   background: var(--sia-surface) !important; color: var(--sia-primary) !important;
-  border: 1.5px solid color-mix(in srgb, var(--sia-primary) 45%, transparent) !important;
+  border: 1.5px solid var(--sia-border-strong) !important;
 }}
 button[kind^="secondary"] p, button[data-testid^="stBaseButton-secondary"] p, [data-testid="stPopoverButton"] p {{
   color: var(--sia-primary) !important;
 }}
 .stButton > button:hover, .stDownloadButton > button:hover, .stFormSubmitButton > button:hover,
-[data-testid="stPopoverButton"]:hover {{
-  transform: translateY(-2px); box-shadow: var(--sia-shadow-hover) !important;
+[data-testid="stPopoverButton"]:hover {{ transform: translateY(-2px); box-shadow: var(--sia-shadow-hover) !important; }}
+button[kind^="primary"]:hover, button[data-testid^="stBaseButton-primary"]:hover {{
+  background: linear-gradient(135deg, var(--sia-primary-2) 0%, var(--sia-accent) 100%) !important;
 }}
-button[kind^="secondary"]:hover, button[data-testid^="stBaseButton-secondary"]:hover {{
-  background: var(--sia-accent-soft) !important; border-color: var(--sia-primary) !important;
+button[kind^="secondary"]:hover, button[data-testid^="stBaseButton-secondary"]:hover, [data-testid="stPopoverButton"]:hover {{
+  background: var(--sia-accent-soft) !important; border-color: var(--sia-primary-2) !important;
 }}
+button[data-testid="stBaseButton-elementToolbar"] {{ box-shadow: none !important; border: none !important; background: transparent !important; }}
 .stButton > button:active, .stFormSubmitButton > button:active {{ transform: translateY(0); }}
 .stButton > button:disabled, .stFormSubmitButton > button:disabled {{ opacity: .55; transform: none; box-shadow: none !important; }}
 
@@ -160,64 +184,74 @@ button[kind^="secondary"]:hover, button[data-testid^="stBaseButton-secondary"]:h
 [data-testid="stForm"], [data-testid="stExpander"] details, div[data-testid="stVerticalBlockBorderWrapper"],
 [data-testid="stCameraInput"], [data-testid="stPopoverBody"], [data-testid="stMetric"] {{
   background: var(--sia-surface) !important; border: 1px solid var(--sia-border) !important;
-  border-radius: 16px !important; box-shadow: var(--sia-shadow);
+  border-radius: 18px !important; box-shadow: var(--sia-shadow);
 }}
 [data-testid="stForm"] {{ padding: 1.2rem 1.3rem !important; }}
 [data-testid="stMetric"] {{ padding: .85rem 1rem; }}
 [data-testid="stMetricValue"], [data-testid="stMetricValue"] div {{ color: var(--sia-ink) !important; }}
 [data-testid="stMetricLabel"] p {{ color: var(--sia-muted) !important; }}
-[data-testid="stExpander"] summary {{ background: var(--sia-surface) !important; border-radius: 16px; }}
-[data-testid="stExpander"] details[open] > summary {{ border-radius: 16px 16px 0 0; }}
+[data-testid="stExpander"] summary {{ background: var(--sia-surface) !important; border-radius: 18px; }}
+[data-testid="stExpander"] details[open] > summary {{ border-radius: 18px 18px 0 0; }}
 [data-testid="stExpander"] summary, [data-testid="stExpander"] summary p, [data-testid="stExpander"] summary span {{
   color: var(--sia-ink) !important;
 }}
 [data-testid="stExpander"] summary:hover {{ background: var(--sia-surface-2) !important; }}
-[data-testid="stExpander"] summary:hover p {{ color: var(--sia-primary) !important; }}
-[data-testid="stAlert"], [data-testid="stAlertContainer"] {{ border-radius: 12px !important; }}
+[data-testid="stExpander"] summary:hover p {{ color: var(--sia-primary-2) !important; }}
+[data-testid="stAlert"], [data-testid="stAlertContainer"] {{ border-radius: 14px !important; }}
 [data-testid="stCode"] pre, [data-testid="stCode"] code, .stCodeBlock pre {{
   background: var(--sia-surface-2) !important; color: var(--sia-ink) !important; border-radius: 12px !important;
 }}
-[data-testid="stDataFrame"], [data-testid="stDataEditor"] {{ border-radius: 12px; overflow: hidden; border: 1px solid var(--sia-border); }}
-[data-testid="stImage"] img {{ border-radius: 12px; }}
+[data-testid="stDataFrame"], [data-testid="stDataEditor"] {{
+  border-radius: 14px; overflow: hidden; border: 1px solid var(--sia-border);
+}}
+[data-testid="stImage"] img {{ border-radius: 14px; }}
 hr {{ border-color: var(--sia-border) !important; }}
 
-/* ---------- Pestañas ---------- */
-.stTabs [data-baseweb="tab-list"] {{ gap: .4rem; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }}
-.stTabs [data-baseweb="tab"] {{
-  background: var(--sia-surface-2); border-radius: 12px 12px 0 0; padding: .5rem 1rem; font-weight: 600;
-  white-space: nowrap; color: var(--sia-ink);
+/* ---------- Pestañas tipo píldora ---------- */
+.stTabs [role="tablist"], .stTabs [data-baseweb="tab-list"] {{
+  gap: .5rem; overflow-x: auto; scrollbar-width: thin; padding: .35rem; border-radius: 25px;
+  background: var(--sia-surface); border: 1px solid var(--sia-border); box-shadow: var(--sia-shadow);
 }}
-.stTabs [data-baseweb="tab"] p {{ color: var(--sia-ink); }}
-.stTabs [aria-selected="true"] {{ background: linear-gradient(135deg, var(--sia-primary), var(--sia-primary-2)) !important; }}
-.stTabs [aria-selected="true"] p {{ color: var(--sia-primary-ink) !important; }}
-.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {{ display: none; }}
+.stTabs [role="tab"], .stTabs [data-baseweb="tab"] {{
+  border-radius: 25px !important; padding: .5rem 1.1rem !important; white-space: nowrap; height: auto !important;
+  background: transparent; border: 1px solid transparent !important; transition: background .15s ease, border-color .15s ease;
+}}
+.stTabs [role="tab"] p {{ color: var(--sia-ink); font-weight: 600; }}
+.stTabs [role="tab"]:hover {{ background: var(--sia-accent-soft); border-color: var(--sia-border) !important; }}
+.stTabs [role="tab"][aria-selected="true"] {{
+  background: var(--sia-tab-activa) !important; box-shadow: 0 4px 14px color-mix(in srgb, var(--sia-primary) 35%, transparent);
+}}
+.stTabs [role="tab"][aria-selected="true"] p {{ color: #FFFFFF !important; font-weight: 800 !important; }}
+.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {{ display: none !important; }}
 
 /* ---------- Componentes SIA ---------- */
 .sia-hero {{
   display: flex; align-items: center; gap: 1.2rem;
-  background: linear-gradient(120deg, #0B3D91 0%, #0B5CAD 45%, #1E9BD7 100%);
-  color: #fff; border-radius: 20px; padding: 1.3rem 1.6rem; margin-bottom: 1.2rem;
-  box-shadow: 0 12px 30px rgba(11,92,173,.28);
+  background: linear-gradient(120deg, {noche} 0%, {oscuro} 38%, {azul} 72%, {lavanda} 100%);
+  color: #fff; border-radius: 22px; padding: 1.3rem 1.6rem; margin-bottom: 1.2rem;
+  box-shadow: 0 14px 32px rgba(2,68,123,.30); border-bottom: 4px solid {lila};
 }}
 .sia-hero h1 {{ color: #fff !important; font-size: 1.65rem; margin: 0 0 .15rem 0; padding: 0; line-height: 1.2; }}
-.sia-hero p {{ margin: 0; opacity: .93; color: #fff !important; }}
+.sia-hero p {{ margin: 0; opacity: .95; color: #fff !important; }}
 .sia-hero .sia-logo {{ flex: 0 0 auto; }}
 .sia-hero a, .sia-hero [data-testid="stHeaderActionElements"] {{ display: none !important; }}
-.sia-logo img {{ display: block; height: 64px; width: auto; max-width: 160px; object-fit: contain;
-  background: #fff; border-radius: 14px; padding: 6px; }}
+.sia-logo img {{
+  display: block; width: 72px; height: 72px; object-fit: cover; border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(255,255,255,.85), 0 6px 16px rgba(0,0,0,.25);
+}}
 .sia-logo-placeholder {{
-  width: 64px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
-  background: #fff; color: #0B5CAD !important; font-weight: 900; font-size: 1.25rem; letter-spacing: .04em;
-  box-shadow: inset 0 0 0 3px #1E9BD7;
+  width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: #fff; color: {azul} !important; font-weight: 900; font-size: 1.25rem; letter-spacing: .04em;
+  box-shadow: inset 0 0 0 4px {lavanda};
 }}
 .sia-brand {{ display: flex; align-items: center; gap: .75rem; margin-bottom: .6rem; }}
-.sia-brand .sia-logo img {{ height: 48px; }}
-.sia-brand .sia-logo-placeholder {{ width: 48px; height: 48px; font-size: 1rem; border-radius: 12px; }}
+.sia-brand .sia-logo img, .sia-brand .sia-logo-placeholder {{ width: 52px; height: 52px; font-size: 1rem; }}
+.sia-brand .sia-logo img {{ box-shadow: 0 0 0 2px var(--sia-border-strong); }}
 .sia-brand b {{ font-size: 1.05rem; color: var(--sia-ink); }}
 .sia-brand small {{ display: block; color: var(--sia-muted); font-size: .78rem; line-height: 1.25; }}
 
 .sia-card {{
-  background: var(--sia-surface); border: 1px solid var(--sia-border); border-radius: 16px;
+  background: var(--sia-surface); border: 1px solid var(--sia-border); border-radius: 18px;
   padding: 1.1rem 1.25rem; box-shadow: var(--sia-shadow); margin-bottom: .8rem; color: var(--sia-ink);
   overflow-wrap: anywhere; transition: box-shadow .2s ease, transform .2s ease;
 }}
@@ -225,29 +259,30 @@ hr {{ border-color: var(--sia-border) !important; }}
 .sia-card .muted, .sia-muted {{ color: var(--sia-muted); font-size: .88rem; }}
 .sia-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .9rem; margin-bottom: 1rem; }}
 .sia-grid .sia-card {{ margin-bottom: 0; }}
-.sia-kpi {{ border-left: 5px solid var(--tono); }}
+.sia-kpi {{ border-left: 6px solid var(--tono); }}
 .sia-kpi .label {{ font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--sia-muted); }}
 .sia-kpi .value {{ font-size: 2rem; font-weight: 800; color: var(--sia-ink); line-height: 1.15; margin-top: .2rem; }}
 .sia-kpi .sub {{ font-size: .82rem; color: var(--sia-muted); margin-top: .15rem; }}
 
 .sia-chips {{ display: flex; flex-wrap: wrap; gap: .4rem; margin: .35rem 0 .6rem; }}
 .sia-chip {{
-  display: inline-flex; align-items: center; gap: .3rem; padding: .25rem .7rem; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: .3rem; padding: .28rem .75rem; border-radius: 999px;
   background: var(--sia-accent-soft); color: var(--sia-ink); font-size: .82rem; font-weight: 600;
   border: 1px solid var(--sia-border);
 }}
 .sia-code {{
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1.5rem; font-weight: 800;
-  letter-spacing: .12em; color: var(--sia-primary); background: var(--sia-accent-soft); border-radius: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important; font-size: 1.5rem; font-weight: 800;
+  letter-spacing: .12em; color: var(--sia-primary); background: var(--sia-accent-soft); border-radius: 14px;
   padding: .4rem .9rem; display: inline-block; max-width: 100%; overflow-wrap: anywhere;
+  border: 1px dashed var(--sia-border-strong);
 }}
 .sia-pin {{ font-size: 2.8rem; letter-spacing: .28em; }}
 .sia-badge {{
-  display: inline-block; padding: .18rem .65rem; border-radius: 999px; font-size: .78rem;
+  display: inline-block; padding: .2rem .7rem; border-radius: 999px; font-size: .78rem;
   font-weight: 700; color: #fff !important; background: var(--tono);
 }}
 .sia-alerta {{
-  border-radius: 14px; padding: .8rem 1rem; margin-bottom: .55rem; border: 1px solid var(--sia-border);
+  border-radius: 16px; padding: .8rem 1rem; margin-bottom: .55rem; border: 1px solid var(--sia-border);
   border-left: 6px solid var(--tono); background: var(--sia-surface); box-shadow: var(--sia-shadow);
   overflow-wrap: anywhere;
 }}
@@ -255,18 +290,29 @@ hr {{ border-color: var(--sia-border) !important; }}
 .sia-alerta span {{ color: var(--sia-muted); font-size: .88rem; }}
 .sia-barra {{ height: 8px; border-radius: 999px; background: var(--sia-surface-2); overflow: hidden; margin-top: .55rem; }}
 .sia-barra > div {{ height: 100%; border-radius: 999px; background: var(--tono); }}
-.sia-aviso-camara {{
+.sia-aviso, .sia-aviso-camara {{
   background: var(--sia-accent-soft); color: var(--sia-ink); border: 1px solid var(--sia-border);
-  border-left: 5px solid var(--sia-primary); border-radius: 12px; padding: .75rem .95rem; margin: .4rem 0 .7rem;
-  font-size: .9rem; line-height: 1.45; overflow-wrap: anywhere;
+  border-left: 6px solid var(--sia-accent); border-radius: 14px; padding: .8rem 1rem; margin: .4rem 0 .8rem;
+  font-size: .92rem; line-height: 1.5; overflow-wrap: anywhere;
 }}
+.sia-aviso b {{ color: var(--sia-ink); }}
 [data-testid="stCameraInput"] {{ overflow: hidden; max-width: 100%; }}
-[data-testid="stCameraInput"] video, [data-testid="stCameraInput"] img {{ max-width: 100%; height: auto; border-radius: 12px; }}
+[data-testid="stCameraInput"] video, [data-testid="stCameraInput"] img {{ max-width: 100%; height: auto; border-radius: 14px; }}
+
 .sia-footer {{
-  margin-top: 2.5rem; padding: 1rem; text-align: center; color: var(--sia-muted); font-size: .85rem;
-  border-top: 1px solid var(--sia-border);
+  margin-top: 2.5rem; padding: 1rem; display: flex; align-items: center; justify-content: center; gap: .6rem;
+  flex-wrap: wrap; text-align: center; color: var(--sia-muted); font-size: .86rem; border-top: 1px solid var(--sia-border);
 }}
-.sia-footer b {{ color: var(--sia-primary); }}
+.sia-footer b {{ color: var(--sia-primary-2); }}
+.sia-footer img {{
+  width: 46px; height: 46px; object-fit: contain; background: #FFFFFF; border-radius: 12px; padding: 3px;
+  box-shadow: var(--sia-shadow); border: 1px solid var(--sia-border); flex: 0 0 auto;
+}}
+.sia-tech-placeholder {{ width: 34px; height: 34px; border-radius: 50%; flex: 0 0 auto; }}
+.sia-tech-placeholder {{
+  display: inline-flex; align-items: center; justify-content: center; font-size: .7rem; font-weight: 800; color: #fff;
+  background: linear-gradient(135deg, {azul}, {lila});
+}}
 
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {{
@@ -274,9 +320,10 @@ hr {{ border-color: var(--sia-border) !important; }}
 }}
 @media (max-width: 768px) {{
   .block-container {{ padding: .9rem .8rem 3rem !important; }}
-  .sia-hero {{ flex-direction: column; text-align: center; padding: 1.1rem 1rem; gap: .7rem; border-radius: 16px; }}
+  .sia-hero {{ flex-direction: column; text-align: center; padding: 1.1rem 1rem; gap: .7rem; border-radius: 18px; }}
   .sia-hero h1 {{ font-size: 1.3rem; }}
   .sia-hero p {{ font-size: .9rem; }}
+  .sia-logo img, .sia-logo-placeholder {{ width: 60px; height: 60px; }}
   .sia-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }}
   .sia-card {{ padding: .9rem 1rem; }}
   .sia-kpi .value {{ font-size: 1.35rem; }}
@@ -287,7 +334,8 @@ hr {{ border-color: var(--sia-border) !important; }}
   [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
     width: 100% !important; flex: 1 1 100% !important; min-width: 100% !important;
   }}
-  .stTabs [data-baseweb="tab"] {{ padding: .4rem .7rem; font-size: .85rem; }}
+  .stTabs [role="tab"] {{ padding: .42rem .8rem !important; }}
+  .stTabs [role="tab"] p {{ font-size: .85rem; }}
   [data-testid="stForm"] {{ padding: .9rem !important; }}
 }}
 @media (max-width: 340px) {{
@@ -296,45 +344,50 @@ hr {{ border-color: var(--sia-border) !important; }}
 </style>
 """
 
-
-# Reglas que solo se inyectan en modo oscuro (contraste reforzado).
-_CSS_OSCURO = """
+# Reglas que solo se inyectan en modo oscuro (contraste reforzado sobre #003467 / #02447B).
+_CSS_OSCURO = f"""
 <style>
-/* Botones secundarios / popovers (sidebar: Cambiar contraseña, Cerrar sesión): texto blanco y borde definido */
-button[kind^="secondary"], button[data-testid^="stBaseButton-secondary"], [data-testid="stPopoverButton"] {
-  color: #FFFFFF !important; background: rgba(59, 130, 246, 0.12) !important; border: 1px solid #3B82F6 !important;
-}
+section[data-testid="stSidebar"] {{ background: {AZUL_NOCHE} !important; border-right-color: rgba(121,121,177,.55); }}
+section[data-testid="stSidebar"] .sia-card {{ background: {AZUL_OSCURO}; border-color: rgba(121,121,177,.7); }}
+button[kind^="secondary"], button[data-testid^="stBaseButton-secondary"], [data-testid="stPopoverButton"] {{
+  color: #FFFFFF !important; background: rgba(52, 111, 176, 0.30) !important; border: 1px solid {LAVANDA} !important;
+}}
 button[kind^="secondary"] p, button[data-testid^="stBaseButton-secondary"] p, [data-testid="stPopoverButton"] p,
-button[kind^="secondary"] span, [data-testid="stPopoverButton"] span { color: #FFFFFF !important; }
-button[kind^="secondary"]:hover, button[data-testid^="stBaseButton-secondary"]:hover, [data-testid="stPopoverButton"]:hover {
-  background: rgba(59, 130, 246, 0.28) !important; border-color: #60A5FA !important;
-}
-button[data-testid="stBaseButton-elementToolbar"] { background: transparent !important; border: none !important; }
-.sia-badge { color: #FFFFFF !important; border: 1px solid #3B82F6; box-shadow: 0 0 0 1px rgba(59,130,246,.25); }
-section[data-testid="stSidebar"] { background: #0F172A !important; }
-section[data-testid="stSidebar"] .sia-card { background: #1E293B; border-color: rgba(59,130,246,.35); }
+button[kind^="secondary"] span, [data-testid="stPopoverButton"] span {{ color: #FFFFFF !important; }}
+button[kind^="secondary"]:hover, button[data-testid^="stBaseButton-secondary"]:hover, [data-testid="stPopoverButton"]:hover {{
+  background: rgba(183, 143, 182, 0.30) !important; border-color: {LILA} !important;
+}}
+button[data-testid="stBaseButton-elementToolbar"] {{ background: transparent !important; border: none !important; }}
+.sia-badge {{ color: #FFFFFF !important; border: 1px solid {LILA}; }}
+.sia-code {{ color: #FFFFFF; }}
 
-/* Tablas (st.dataframe / st.data_editor): se dibujan en <canvas> con los colores del tema base, que el CSS
-   no puede repintar. Un filtro invierte la luminosidad y conserva el tono: celdas oscuras y texto claro. */
-[data-testid="stDataFrame"], [data-testid="stDataEditor"] {
-  filter: invert(0.9) hue-rotate(180deg) saturate(1.15);
-  border-color: rgba(147, 197, 253, 0.6) !important;
-  background: #F2F6FB;
-}
-[data-testid="stTable"] table, [data-testid="stTable"] th, [data-testid="stTable"] td {
-  background: #1E293B !important; color: #E2E8F0 !important; border-color: rgba(59,130,246,.25) !important;
-}
+/* Tablas (st.dataframe / st.data_editor): se dibujan en <canvas> con los colores del tema base y el CSS no
+   puede repintar sus celdas. 1) Un filtro invierte la luminosidad conservando los tonos (✅ ❌ siguen en color).
+   2) Una capa en modo "screen" con #003467 tiñe de azul los fondos oscuros sin apagar el texto claro. */
+[data-testid="stDataFrame"], [data-testid="stDataEditor"] {{
+  filter: invert(0.92) hue-rotate(180deg) saturate(1.1);
+  border-color: rgba(183, 143, 182, 0.7) !important;
+}}
+[data-testid="stFullScreenFrame"]:has(> [data-testid="stDataFrame"]),
+[data-testid="stFullScreenFrame"]:has(> [data-testid="stDataEditor"]) {{ position: relative; }}
+[data-testid="stFullScreenFrame"]:has(> [data-testid="stDataFrame"])::after,
+[data-testid="stFullScreenFrame"]:has(> [data-testid="stDataEditor"])::after {{
+  content: ""; position: absolute; inset: 0; border-radius: 14px; pointer-events: none;
+  background: {AZUL_NOCHE}; mix-blend-mode: screen;
+}}
+[data-testid="stTable"] table, [data-testid="stTable"] th, [data-testid="stTable"] td {{
+  background: {AZUL_OSCURO} !important; color: #F4F7FC !important; border-color: rgba(121,121,177,.5) !important;
+}}
 
 /* Cámara */
-[data-testid="stCameraInput"] { background: #1E293B !important; }
-[data-testid="stCameraInput"] * { color: #E2E8F0; }
-[data-testid="stCameraInput"] video, [data-testid="stCameraInput"] img { border-radius: 12px; }
-[data-testid="stCameraInput"] button { color: #FFFFFF !important; background: rgba(59,130,246,.18) !important; border: 1px solid #3B82F6 !important; }
+[data-testid="stCameraInput"] {{ background: {AZUL_OSCURO} !important; }}
+[data-testid="stCameraInput"] * {{ color: #F4F7FC; }}
+[data-testid="stCameraInput"] button {{ color: #FFFFFF !important; background: rgba(52,111,176,.4) !important; border: 1px solid {LAVANDA} !important; }}
 
 /* Alertas legibles sobre fondo oscuro */
-[data-testid="stAlertContainer"] { background: #1E293B !important; border: 1px solid rgba(59,130,246,.35) !important; }
-[data-testid="stAlertContainer"] p, [data-testid="stAlertContainer"] li { color: #E2E8F0 !important; }
-[data-testid="stCode"] pre, [data-testid="stCode"] code { background: #0F172A !important; color: #E2E8F0 !important; }
+[data-testid="stAlertContainer"] {{ background: {AZUL_OSCURO} !important; border: 1px solid rgba(121,121,177,.6) !important; }}
+[data-testid="stAlertContainer"] p, [data-testid="stAlertContainer"] li {{ color: #F4F7FC !important; }}
+[data-testid="stCode"] pre, [data-testid="stCode"] code {{ background: {AZUL_NOCHE} !important; color: #F4F7FC !important; }}
 </style>
 """
 
@@ -346,7 +399,10 @@ def modo_oscuro() -> bool:
 
 def inyectar_css() -> None:
     oscuro = modo_oscuro()
-    css = _CSS.format(variables=_VARIABLES["oscuro" if oscuro else "claro"])
+    css = _CSS.format(
+        variables=_VARIABLES["oscuro" if oscuro else "claro"], fuente=FUENTE,
+        azul=AZUL, lavanda=LAVANDA, lila=LILA, oscuro=AZUL_OSCURO, noche=AZUL_NOCHE,
+    )
     st.markdown(css + (_CSS_OSCURO if oscuro else ""), unsafe_allow_html=True)
 
 
@@ -354,29 +410,52 @@ def selector_tema() -> None:
     st.toggle("🌙 Modo oscuro", key=CLAVE_TEMA, help="Alterna entre modo claro y oscuro.")
 
 
-# ---------------------------------------------------------------- logo
+# ---------------------------------------------------------------- logos
+def _buscar(nombres: tuple[str, ...]) -> Path | None:
+    return next((ASSETS / n for n in nombres if (ASSETS / n).exists()), None)
+
+
 def ruta_logo() -> Path | None:
-    for nombre in _NOMBRES_LOGO:
-        ruta = ASSETS / nombre
-        if ruta.exists():
-            return ruta
-    return None
+    """Logo del IES N° 11 (assets/logo_ies.png, logo_ies11.png o logo_ise.png)."""
+    return _buscar(_NOMBRES_LOGO_IES)
 
 
-@lru_cache(maxsize=1)
-def _logo_data_uri() -> str | None:
-    ruta = ruta_logo()
-    if ruta is None:
-        return None
-    return f"data:{_MIME[ruta.suffix.lower()]};base64,{base64.b64encode(ruta.read_bytes()).decode()}"
+def ruta_logo_tech() -> Path | None:
+    return _buscar(_NOMBRES_LOGO_TECH)
+
+
+@lru_cache(maxsize=8)
+def _data_uri(ruta: str, lado: int, _mtime: float) -> str:
+    """Imagen embebida y reducida (evita enviar el PNG original completo en cada recarga)."""
+    archivo = Path(ruta)
+    if archivo.suffix.lower() == ".svg":
+        return f"data:image/svg+xml;base64,{base64.b64encode(archivo.read_bytes()).decode()}"
+    from PIL import Image
+
+    imagen = Image.open(archivo)
+    imagen.thumbnail((lado, lado))
+    buffer = io.BytesIO()
+    imagen.save(buffer, format="PNG", optimize=True)
+    return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+
+
+def _img(ruta: Path | None, lado: int) -> str | None:
+    return _data_uri(str(ruta), lado, ruta.stat().st_mtime) if ruta else None
 
 
 def logo_html() -> str:
-    uri = _logo_data_uri()
+    uri = _img(ruta_logo(), 192)
     if uri:
         return f'<div class="sia-logo"><img src="{uri}" alt="Logo {INSTITUCION_CORTA}"></div>'
     return (f'<div class="sia-logo"><div class="sia-logo-placeholder" title="{INSTITUCION} — agregá '
-            f'assets/logo_ise.png para mostrar el logo oficial">IES</div></div>')
+            f'assets/logo_ies.png para mostrar el logo oficial">IES</div></div>')
+
+
+def logo_tech_html() -> str:
+    uri = _img(ruta_logo_tech(), 96)
+    if uri:
+        return f'<img src="{uri}" alt="Logo {EQUIPO}">'
+    return f'<span class="sia-tech-placeholder" title="Agregá assets/logo_tech.png">TI</span>'
 
 
 def marca_sidebar() -> None:
@@ -402,9 +481,15 @@ def hero(titulo: str, subtitulo: str = "") -> None:
 
 def footer() -> None:
     st.markdown(
-        f'<div class="sia-footer">{_html(TITULO_APP)} · {_html(INSTITUCION)} — Desarrollado por <b>Tech Innovation Team</b></div>',
+        f'<div class="sia-footer">{logo_tech_html()}'
+        f'<span>Desarrollado por <b>{EQUIPO}</b> — {_html(INSTITUCION_CORTA)}</span></div>',
         unsafe_allow_html=True,
     )
+
+
+def aviso(html_seguro: str) -> None:
+    """Caja destacada con acento lila (el contenido debe venir ya escapado)."""
+    st.markdown(f'<div class="sia-aviso">{html_seguro}</div>', unsafe_allow_html=True)
 
 
 def _kpi_html(label: str, valor, sub: str = "", tono: str = "azul") -> str:
@@ -473,22 +558,24 @@ def tono_porcentaje(pct: float, umbral: float) -> str:
 
 def estilo_plotly(fig, alto: int = 360):
     oscuro = modo_oscuro()
-    texto = "#E2E8F0" if oscuro else "#0B1F3A"
-    grilla = "rgba(148,163,184,.22)" if oscuro else "rgba(11,31,58,.08)"
-    linea = "rgba(148,163,184,.45)" if oscuro else "rgba(11,31,58,.25)"
+    texto = "#E2E8F0" if oscuro else "#0E2747"
+    grilla = "rgba(201,212,234,.20)" if oscuro else "rgba(121,121,177,.18)"
+    linea = "rgba(201,212,234,.45)" if oscuro else "rgba(52,111,176,.35)"
     fig.update_layout(
         template="plotly_dark" if oscuro else "plotly_white",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         height=alto,
         margin=dict(l=10, r=10, t=48, b=10),
-        font=dict(family="Inter, system-ui, sans-serif", size=13, color=texto),
+        font=dict(family="Plus Jakarta Sans, Inter, Nunito, sans-serif", size=13, color=texto),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
                     font=dict(color=texto), title=dict(font=dict(color=texto)), bgcolor="rgba(0,0,0,0)"),
         title_font=dict(size=15, color=texto),
-        hoverlabel=dict(bgcolor="#1E293B" if oscuro else "#FFFFFF", font=dict(color=texto)),
-        colorway=["#3B82F6", "#38BDF8", "#7DD3FC", "#10B981", "#F59E0B", "#A5B4FC"] if oscuro
-        else ["#0B5CAD", "#1E9BD7", "#4FC3F7", "#0E9F6E", "#D98E04", "#7C8DB5"],
+        hoverlabel=dict(bgcolor=AZUL_OSCURO if oscuro else "#FFFFFF", font=dict(color=texto),
+                        bordercolor=LAVANDA),
+        # En oscuro se usan variantes más claras de la paleta para mantener el contraste sobre #003467.
+        colorway=["#7FA9DE", "#D4B6D3", "#A9A9D6", "#5FC4A0", "#F0C36B", "#E8A0A0"] if oscuro
+        else [AZUL, LILA, LAVANDA, AZUL_OSCURO, "#2E9E77", "#D99A2B"],
     )
     ejes = dict(gridcolor=grilla, zerolinecolor=grilla, linecolor=linea,
                 tickfont=dict(color=texto), title_font=dict(color=texto))

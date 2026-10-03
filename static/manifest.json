@@ -1,0 +1,17 @@
+{
+  "name": "SIA · IES N° 11 — Sistema de Asistencia Inteligente",
+  "short_name": "SIA IES 11",
+  "description": "Asistencia por QR, sábana digital y estadísticas del Instituto de Educación Superior N° 11.",
+  "lang": "es-AR",
+  "start_url": "../../",
+  "scope": "../../",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#003467",
+  "theme_color": "#003467",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

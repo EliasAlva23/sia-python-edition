@@ -19,7 +19,7 @@ from utils.qr import (
 )
 from views import auth
 from views.styles import (
-    COLORES_NIVEL, EMOJI_NIVEL, TONOS, alerta, aviso_camara, chips, codigo, estilo_plotly, hero, kpi_grid, mostrar_errores,
+    AZUL, COLORES_NIVEL, EMOJI_NIVEL, LAVANDA, LILA, TONOS, alerta, aviso_camara, chips, codigo, estilo_plotly, hero, kpi_grid, mostrar_errores,
     tono_porcentaje,
 )
 
@@ -450,7 +450,7 @@ def _tab_sabana(materia: Materia, materias: list[Materia]) -> None:
         por_dia["dia"] = por_dia["dia"].map(lambda d: DIAS[int(d)])
         fig = px.bar(por_dia, x="dia", y="presente", title="Asistencia por día de la semana (%)",
                      labels={"dia": "", "presente": "% asistencia"}, color="presente",
-                     color_continuous_scale=["#9CC7EE", "#1E9BD7", "#0B5CAD"], range_color=[0, 100])
+                     color_continuous_scale=[LILA, LAVANDA, AZUL], range_color=[0, 100])
         fig.update_coloraxes(showscale=False)
         st.plotly_chart(estilo_plotly(fig), width="stretch")
 
@@ -458,8 +458,8 @@ def _tab_sabana(materia: Materia, materias: list[Materia]) -> None:
     mapa = df.assign(etiqueta=etiqueta).pivot_table(index="etiqueta", columns="fecha", values="presente", aggfunc="max")
     mapa = mapa.loc[mapa.mean(axis=1).sort_values().index]
     fig = px.imshow(
-        mapa, color_continuous_scale=[[0, "#F28B82"], [1, "#1E9BD7"]], zmin=0, zmax=1, aspect="auto",
-        title="Mapa de calor (celeste = presente, rojo = ausente, vacío = no inscripto)",
+        mapa, color_continuous_scale=[[0, "#E58FA0"], [1, AZUL]], zmin=0, zmax=1, aspect="auto",
+        title="Mapa de calor (azul = presente, rosa = ausente, vacío = no inscripto)",
         labels={"x": "Clase", "y": "", "color": "Presente"},
     )
     fig.update_coloraxes(showscale=False)

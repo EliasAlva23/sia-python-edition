@@ -57,6 +57,11 @@ class RegistroAsistencia:
     def clase_id(self) -> int:
         return self._clase_id
 
+    def materia_id(self) -> int | None:
+        with get_connection() as conn:
+            fila = conn.execute("SELECT materia_id FROM clases WHERE id = ?", (self._clase_id,)).fetchone()
+        return fila["materia_id"] if fila else None
+
     # ----- tokens dinámicos de clase -----
     def generar_token(self, t: float | None = None) -> str:
         base = f"SIA:C:{self._clase_id}:{_ventana(t)}"

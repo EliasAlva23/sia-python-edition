@@ -49,7 +49,10 @@ def procesar_entrada(texto: str, estudiante: Estudiante) -> ResultadoMarcado:
     """Interpreta lo escaneado/tipeado: QR dinámico de clase (o su URL), PIN o código de inscripción."""
     texto = interpretar_codigo(texto)
     if texto.upper().startswith("SIA:C:"):
-        return RegistroAsistencia.procesar_token_clase(texto, estudiante)
+        clase_id, error = RegistroAsistencia.validar_token_clase(texto)
+        if error:
+            return ResultadoMarcado(False, "error", error)
+        return marcar_con_autoinscripcion(clase_id, estudiante)
     if len(texto) == 6 and texto.isdigit():
         return RegistroAsistencia.procesar_pin(texto, estudiante)
     if texto.upper().startswith("SIA:STUDENT:"):
@@ -63,6 +66,29 @@ def procesar_entrada(texto: str, estudiante: Estudiante) -> ResultadoMarcado:
     return ResultadoMarcado(True, "registrado" if ok else "duplicado", mensaje)
 
 
+def marcar_con_autoinscripcion(clase_id: int, estudiante: Estudiante) -> ResultadoMarcado:
+    """Registra el presente con un QR de clase válido; si el alumno aún no está inscripto, lo inscribe antes.
+
+    El QR de asistencia rota cada 30 s, así que escanearlo prueba que el alumno está en el aula: un alumno
+    nuevo puede crear su cuenta, escanear y quedar inscripto y presente en un solo paso. El docente puede
+    darlo de baja desde «Alumnos inscriptos» si corresponde.
+    """
+    registro = RegistroAsistencia(clase_id)
+    materia = Materia.obtener(registro.materia_id() or 0)
+    if materia is None:
+        return ResultadoMarcado(False, "error", "La clase del QR ya no existe.")
+    nueva_inscripcion = False
+    if not materia.esta_inscripto(estudiante.id):
+        nueva_inscripcion, mensaje = materia.inscribir(estudiante.id)
+        if not nueva_inscripcion:
+            return ResultadoMarcado(False, "error", mensaje)
+    resultado = registro.marcar(estudiante.id, "qr_clase", estudiante.id)
+    if nueva_inscripcion and resultado.estado == "registrado":
+        return ResultadoMarcado(True, "registrado",
+                                f"Te inscribimos en {materia.nombre} y registramos tu presente.", resultado.estudiante)
+    return resultado
+
+
 def _procesar_accion_pendiente(estudiante: Estudiante) -> None:
     """Completa la acción de un QR escaneado con la cámara nativa del celular (enlace ?asistencia / ?inscribir)."""
     accion = st.session_state.pop("accion_pendiente", None)
@@ -73,7 +99,7 @@ def _procesar_accion_pendiente(estudiante: Estudiante) -> None:
     elif time.time() - accion["capturado"] > MINUTOS_ENLACE * 60:
         resultado = ResultadoMarcado(False, "error", "El enlace escaneado venció. Volvé a escanear el QR.")
     elif accion["tipo"] == "asistencia":
-        resultado = RegistroAsistencia(accion["clase_id"]).marcar(estudiante.id, "qr_clase", estudiante.id)
+        resultado = marcar_con_autoinscripcion(accion["clase_id"], estudiante)
     else:
         resultado = procesar_entrada(accion["codigo"], estudiante)
     _guardar_resultado(resultado)

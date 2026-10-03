@@ -42,7 +42,7 @@ except ImportError:  # respaldo: la app arranca aunque el módulo de estilos est
 
 st.set_page_config(
     page_title=f"{TITULO_APP} · Asistencia Inteligente",
-    page_icon="🎓",
+    page_icon=str(_RAIZ / "static" / "icon-192.png") if (_RAIZ / "static" / "icon-192.png").exists() else "🎓",
     layout="wide",
     initial_sidebar_state="auto",
 )
@@ -51,7 +51,8 @@ from core.database import init_db  # noqa: E402
 from models.asistencia import RegistroAsistencia  # noqa: E402
 from models.materia import Materia  # noqa: E402
 from views import alumno, auth, docente  # noqa: E402
-from views.styles import badge, footer, inyectar_css, marca_sidebar, ruta_logo, selector_tema  # noqa: E402
+from views.pwa import inyectar_pwa  # noqa: E402
+from views.styles import badge, footer, inyectar_css, marca_sidebar, selector_tema  # noqa: E402
 
 
 @st.cache_resource(show_spinner=False)
@@ -102,16 +103,13 @@ def _sidebar_pie(persona) -> None:
             auth.cerrar_sesion("Cerraste sesión correctamente.")
             st.rerun()
         st.caption(f"La sesión expira tras {auth.MINUTOS_INACTIVIDAD} min de inactividad.")
-        st.caption("Desarrollado por **Tech Innovation Team**")
+        st.caption("Desarrollado por **Tech Innovation Team** — IES N° 11")
 
 
 def main() -> None:
     _inicializar_db()
     _capturar_enlace_qr()
     inyectar_css()
-    logo = ruta_logo()
-    if logo is not None and logo.suffix.lower() != ".svg":
-        st.logo(str(logo), size="large")
     with st.sidebar:
         marca_sidebar()
         selector_tema()
@@ -122,11 +120,14 @@ def main() -> None:
     else:
         _sidebar(persona)
         if persona.rol == "docente":
+            if st.session_state.pop("accion_pendiente", None):
+                st.warning("📲 Abriste un QR pensado para estudiantes. Para usarlo, ingresá con una cuenta de estudiante.")
             docente.render(persona)
         else:
             alumno.render(persona)
         _sidebar_pie(persona)
     footer()
+    inyectar_pwa()
 
 
 main()

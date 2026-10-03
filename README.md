@@ -27,11 +27,18 @@ requirements.txt / packages.txt
 
 ## Identidad visual
 
-- **Logo IES N° 11:** colocá el archivo oficial en `assets/logo_ise.png` (ver `assets/LEEME.md`). Se muestra en el
-  encabezado y en la barra lateral; mientras no exista se usa un distintivo provisorio "IES".
-- **Modo claro / oscuro:** interruptor "🌙 Modo oscuro" en la barra lateral (se conserva al cerrar sesión).
-- **Responsive:** tarjetas en grilla CSS, columnas apiladas y pestañas desplazables en celulares.
-- Firma "Desarrollado por Tech Innovation Team" al pie de todas las pantallas.
+- **Paleta:** `#B78FB6` (lila, acentos), `#7979B1` (lavanda, secundarios/hover), `#346FB0` (azul, botones y bordes),
+  `#02447B` (tarjetas en oscuro) y `#003467` (fondo en oscuro).
+- **Tipografía:** Plus Jakarta Sans (con Inter y Nunito de respaldo), cargada desde Google Fonts.
+- **Pestañas tipo píldora**, tarjetas con bordes de 18 px y botones redondeados con sombras suaves.
+- **Logos:** `assets/logo_ies.png` (encabezado y barra lateral) y `assets/logo_tech.png` (pie de página). Ver `assets/LEEME.md`.
+- **Modo claro / oscuro:** interruptor "🌙 Modo oscuro" en la barra lateral.
+
+## Instalación en el celular (PWA)
+
+La app agrega el manifiesto (`static/manifest.json`), los íconos y las etiquetas `<meta>` necesarias para
+"Agregar a pantalla principal" en Android (Chrome) e iOS (Safari → Compartir → Agregar a inicio).
+Requiere `server.enableStaticServing = true` en `.streamlit/config.toml` (ya configurado).
 
 ## Materias
 
@@ -43,7 +50,9 @@ Las bases creadas con la versión anterior se migran solas al iniciar (se agrega
 Si la app tiene URL pública (`SIA_PUBLIC_URL` en Secrets, o detectada del navegador cuando no es localhost),
 los QR son enlaces: escaneados con la **cámara nativa del celular** abren la app y, tras iniciar sesión,
 inscriben al alumno (`?inscribir=<código>&f=<firma>`) o registran su presente (`?asistencia=<token>`).
-El token de asistencia se valida al abrir el enlace, así el alumno tiene hasta 10 minutos para iniciar sesión.
+El token de asistencia se valida al abrir el enlace, así el alumno tiene hasta 10 minutos para iniciar sesión
+o crear su cuenta. Si todavía no estaba inscripto en esa materia, se lo inscribe y se registra el presente en el
+mismo paso (el docente puede darlo de baja desde «Alumnos inscriptos»).
 En local, los QR contienen el código `SIA:` firmado y se leen con el escáner integrado de la app.
 
 ## Flujo

@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import hmac
 import time
+from html import escape
 
 import streamlit as st
 
 from core import validaciones as val
 from core.security import config_valor
 from models.persona import Docente, Estudiante, Persona, RepositorioPersonas
-from views.styles import CLAVE_TEMA, INSTITUCION, TITULO_APP, hero, mostrar_errores
+from views.styles import CLAVE_TEMA, INSTITUCION, TITULO_APP, aviso, hero, mostrar_errores
 
 MINUTOS_INACTIVIDAD = int(config_valor("SIA_SESSION_MINUTES", "30"))
 HORAS_MAXIMAS = 8
@@ -66,15 +67,27 @@ def usuario_actual() -> Persona | None:
 def render_acceso() -> None:
     hero(f"{TITULO_APP} · Sistema de Asistencia Inteligente",
          f"{INSTITUCION} — asistencia por QR, sábana digital y analítica predictiva")
-    aviso = st.session_state.pop("aviso_sesion", None)
-    if aviso:
-        st.warning(aviso)
+    mensaje_sesion = st.session_state.pop("aviso_sesion", None)
+    if mensaje_sesion:
+        st.warning(mensaje_sesion)
     pendiente = st.session_state.get("accion_pendiente")
-    if pendiente:
-        st.info(f"📲 {pendiente['descripcion']} Iniciá sesión con tu cuenta de estudiante para completarlo.")
+    if pendiente and pendiente.get("error"):
+        # QR vencido o adulterado: avisamos ya, sin hacer iniciar sesión para nada.
+        st.session_state.pop("accion_pendiente", None)
+        st.error(f"⛔ {pendiente['error']}")
+        pendiente = None
 
     _, centro, _ = st.columns([1, 2.2, 1])
     with centro:
+        if pendiente:
+            accion = ("registrar tu presente" if pendiente["tipo"] == "asistencia"
+                      else "inscribirte en la materia")
+            aviso(
+                f"<b>📲 {escape(pendiente['descripcion'])}</b><br>"
+                f"• Si ya tenés cuenta, ingresá en <b>🔐 Ingresar</b>.<br>"
+                f"• Si es tu primera vez, completá <b>📝 Crear cuenta</b> (cuenta de estudiante).<br>"
+                f"Al terminar vamos a {accion} automáticamente: no hace falta volver a escanear."
+            )
         tab_login, tab_registro = st.tabs(["🔐 Ingresar", "📝 Crear cuenta"])
         with tab_login:
             _form_login()
