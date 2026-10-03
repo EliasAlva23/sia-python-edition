@@ -21,7 +21,7 @@ CLAVE_TEMA = "modo_oscuro"
 INSTITUCION = "Instituto de Educación Superior N° 11"
 INSTITUCION_CORTA = "IES N° 11"
 TITULO_APP = f"SIA · {INSTITUCION_CORTA}"
-EQUIPO = "Tech Innovation Team"
+EQUIPO = "Tech &Innovation Team"
 
 # Paleta institucional
 LILA = "#B78FB6"      # acentos y destacados
