@@ -4,12 +4,41 @@ Ejecutar:  streamlit run app.py
 """
 from __future__ import annotations
 
+import sys
 import time
 from html import escape
+from pathlib import Path
 
 import streamlit as st
 
-from views.styles import TITULO_APP
+_RAIZ = Path(__file__).resolve().parent
+_PAQUETES_PROPIOS = ("core", "models", "utils", "views")
+
+
+def _descartar_modulos_desactualizados() -> None:
+    """Fuerza a reimportar los módulos del proyecto cuando su código cambió.
+
+    Al actualizar el repositorio, Streamlit Cloud vuelve a ejecutar app.py pero puede conservar en memoria
+    las versiones anteriores de views/, models/, etc. Si app.py nuevo pide un nombre que el módulo viejo no
+    tiene, aparece un ImportError (p. ej. `cannot import name 'TITULO_APP'`). Comparamos la fecha de
+    modificación de los .py con la registrada en la ejecución anterior y, si cambió, los descartamos.
+    """
+    archivos = [p for paquete in _PAQUETES_PROPIOS for p in (_RAIZ / paquete).rglob("*.py")]
+    firma = tuple(sorted((str(p), p.stat().st_mtime_ns) for p in archivos if p.exists()))
+    if getattr(sys, "_sia_firma_codigo", None) != firma:
+        for nombre, modulo in list(sys.modules.items()):
+            archivo = getattr(modulo, "__file__", None) or ""
+            if nombre.split(".")[0] in _PAQUETES_PROPIOS and archivo.startswith(str(_RAIZ)):
+                del sys.modules[nombre]
+        sys._sia_firma_codigo = firma
+
+
+_descartar_modulos_desactualizados()
+
+try:
+    from views.styles import TITULO_APP
+except ImportError:  # respaldo: la app arranca aunque el módulo de estilos esté desactualizado
+    TITULO_APP = "SIA · IES N° 11"
 
 st.set_page_config(
     page_title=f"{TITULO_APP} · Asistencia Inteligente",
