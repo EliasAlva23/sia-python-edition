@@ -120,11 +120,14 @@ def _form_registro() -> None:
     rol = st.radio("Tipo de cuenta", ["Estudiante", "Docente"], horizontal=True, key="registro_rol")
     codigo_docente = config_valor("SIA_DOCENTE_CODE")
     with st.form("form_registro", clear_on_submit=False):
-        c1, c2 = st.columns(2)
-        nombre = c1.text_input("Nombre *")
-        apellido = c2.text_input("Apellido *")
-        dni = c1.text_input("DNI *", help="Solo números, sin puntos.", max_chars=10)
-        email = c2.text_input("Email *", placeholder="nombre@dominio.com")
+        # Una fila por par de campos (no una columna por lado): en celulares las columnas se apilan y así
+        # el orden queda Nombre → Apellido → DNI → Email → Departamento/Legajo → Contraseña → Repetir.
+        fila1 = st.columns(2)
+        nombre = fila1[0].text_input("Nombre *")
+        apellido = fila1[1].text_input("Apellido *")
+        fila2 = st.columns(2)
+        dni = fila2[0].text_input("DNI *", help="Solo números, sin puntos.", max_chars=10)
+        email = fila2[1].text_input("Email *", placeholder="nombre@dominio.com")
         if rol == "Estudiante":
             extra = st.text_input("Legajo (opcional)", max_chars=30)
         else:
@@ -174,7 +177,8 @@ def _form_registro() -> None:
 
 
 def render_cambio_password(persona: Persona) -> None:
-    with st.popover("🔑 Cambiar contraseña", width="stretch"):
+    # Desplegable (no popover): se muestra dentro del menú ☰, y Streamlit no permite un popover dentro de otro.
+    with st.expander("🔑 Cambiar contraseña"):
         with st.form("form_cambio_pw", clear_on_submit=True):
             actual = st.text_input("Contraseña actual", type="password")
             nueva = st.text_input("Nueva contraseña", type="password")

@@ -32,7 +32,8 @@ requirements.txt / packages.txt
 - **Tipografía:** Plus Jakarta Sans (con Inter y Nunito de respaldo), cargada desde Google Fonts.
 - **Pestañas tipo píldora**, tarjetas con bordes de 18 px y botones redondeados con sombras suaves.
 - **Logos:** `assets/logo_ies.png` (encabezado y barra lateral) y `assets/logo_tech.png` (pie de página). Ver `assets/LEEME.md`.
-- **Modo claro / oscuro:** interruptor "🌙 Modo oscuro" en la barra lateral.
+- **Modo claro / oscuro:** interruptor "🌙 Modo oscuro" en el menú ☰ de la barra superior.
+- **Sin encabezado ni barra lateral de Streamlit:** están ocultos; tema, cambiar contraseña y cerrar sesión están en el menú ☰, y la materia activa del docente se elige arriba de las pestañas.
 
 ## Instalación en el celular (PWA)
 

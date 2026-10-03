@@ -54,12 +54,13 @@ def _selector_materia(materias: list[Materia]) -> Materia | None:
     por_id = {m.id: m for m in materias}
     if st.session_state.get("materia_activa") not in por_id:
         st.session_state["materia_activa"] = materias[0].id
-    with st.sidebar:
-        st.markdown("##### 🎯 Materia activa")
-        seleccion = st.selectbox(
-            "Materia activa", list(por_id), format_func=lambda i: f"{por_id[i].nombre} · {por_id[i].curso}".rstrip(" ·"),
-            key="materia_activa", label_visibility="collapsed",
-        )
+    # En el cuerpo de la página (no en la barra lateral, que no existe: el encabezado nativo está oculto).
+    seleccion = st.selectbox(
+        "🎯 Materia activa", list(por_id),
+        format_func=lambda i: f"{por_id[i].nombre} · {por_id[i].curso}".rstrip(" ·"),
+        key="materia_activa",
+        help="Las pestañas Clase en vivo, Lector QR y Sábana trabajan sobre esta materia.",
+    )
     return por_id[seleccion]
 
 

@@ -3,7 +3,7 @@
 | Archivo | Uso |
 |---|---|
 | `logo_ies.png` | Logo del Instituto de Educación Superior N° 11: encabezado y barra lateral. |
-| `logo_tech.png` | Logo de Tech Innovation Team: pie de página. |
+| `logo_tech.png` | Logo de Tech & Innovation Team: pie de página. |
 
 - Se aceptan también `.webp`, `.jpg`, `.jpeg` o `.svg` con el mismo nombre.
 - Para el IES también se reconocen `logo_ies11.*` (el actual) y `logo_ise.*` (versiones anteriores).
