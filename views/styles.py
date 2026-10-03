@@ -114,10 +114,7 @@ h1, h2, h3, h4 {{ letter-spacing: -0.015em; font-weight: 800 !important; }}
    podría cerrar sesión ni cambiar el tema desde el teléfono. visibility:hidden oculta y desactiva todo,
    y el botón de la barra lateral se vuelve a mostrar explícitamente. */
 header[data-testid="stHeader"] {{ visibility: hidden !important; background: transparent !important; box-shadow: none !important; }}
-[data-testid="stToolbarActions"], [data-testid="stMainMenu"], #MainMenu, [data-testid="stAppDeployButton"],
-.stDeployButton, [data-testid="stDecoration"], [data-testid="stStatusWidget"] {{ display: none !important; }}
 #MainMenu {{ visibility: hidden !important; }}
-footer {{ visibility: hidden !important; }}
 [data-testid="stExpandSidebarButton"] {{
   visibility: visible !important; color: #FFFFFF !important; border-radius: 14px !important;
   background: linear-gradient(135deg, var(--sia-primary), var(--sia-primary-2)) !important;
@@ -406,6 +403,34 @@ button[data-testid="stBaseButton-elementToolbar"] {{ background: transparent !im
 """
 
 
+# Elementos flotantes de Streamlit / Streamlit Cloud (Manage app, distintivo "Hosted with Streamlit",
+# estado de ejecución, decoración superior). Se inyecta en la app y, por el script PWA, también en la página
+# contenedora de Streamlit Cloud, que es donde vive el botón "Manage app" (el CSS de la app no llega ahí).
+# stToolbar NO va con display:none: contiene el botón que abre la barra lateral en celulares; ya queda oculto
+# con visibility:hidden (heredado del encabezado) y ese botón se rescata con visibility:visible.
+CSS_OCULTAR_CLOUD = """
+[data-testid="stStatusWidget"],
+[data-testid="stDecoration"],
+[data-testid="stToolbarActions"],
+[data-testid="stMainMenu"],
+[data-testid="stAppDeployButton"],
+[data-testid="manage-app-button"],
+.stAppViewerFooter,
+.stDeployButton,
+footer,
+div[class*="viewerBadge"],
+div[class*="styles_viewerBadge"],
+iframe[title="streamlit_badge"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+[data-testid="stToolbar"] { visibility: hidden !important; }
+[data-testid="stExpandSidebarButton"] { visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; }
+"""
+
+
 # ---------------------------------------------------------------- tema
 def modo_oscuro() -> bool:
     return bool(st.session_state.get(CLAVE_TEMA, False))
@@ -417,6 +442,7 @@ def inyectar_css() -> None:
         variables=_VARIABLES["oscuro" if oscuro else "claro"], fuente=FUENTE,
         azul=AZUL, lavanda=LAVANDA, lila=LILA, oscuro=AZUL_OSCURO, noche=AZUL_NOCHE,
     )
+    css += f"<style>{CSS_OCULTAR_CLOUD}</style>"
     st.markdown(css + (_CSS_OSCURO if oscuro else ""), unsafe_allow_html=True)
 
 

@@ -11,7 +11,7 @@ import json
 
 import streamlit as st
 
-from views.styles import AZUL_NOCHE
+from views.styles import AZUL_NOCHE, CSS_OCULTAR_CLOUD
 
 _SCRIPT = """
 <script>
@@ -38,6 +38,13 @@ _SCRIPT = """
     });
     if (doc.documentElement) doc.documentElement.setAttribute("lang", "es");
   }
+  function ocultarFlotantes(doc) {
+    if (!doc || !doc.head || doc.getElementById("sia-ocultar-cloud")) return;
+    var estilo = doc.createElement("style");
+    estilo.id = "sia-ocultar-cloud";
+    estilo.textContent = datos.cssOcultar;
+    doc.head.appendChild(estilo);
+  }
   // Documento de la app: el actual, o el padre si este script corre en el iframe de respaldo (srcdoc).
   var doc = document;
   try { if (location.protocol === "about:" && window.parent) doc = window.parent.document; } catch (e) {}
@@ -45,14 +52,21 @@ _SCRIPT = """
   var ruta = doc.location.origin + doc.location.pathname.replace(/[^\\/]*$/, "");
   var base = new URL("app/static/", ruta).href;
   aplicar(doc, base);
-  try { if (window.top && window.top.document !== doc) aplicar(window.top.document, base); } catch (e) {}
+  try {
+    // Página contenedora de Streamlit Cloud (mismo dominio): ahí están "Manage app" y el distintivo.
+    if (window.top && window.top.document !== doc) {
+      aplicar(window.top.document, base);
+      ocultarFlotantes(window.top.document);
+    }
+  } catch (e) {}
 })();
 </script>
 """
 
 
 def inyectar_pwa() -> None:
-    script = _SCRIPT % {"datos": json.dumps({"color": AZUL_NOCHE, "titulo": "SIA IES 11"})}
+    datos = {"color": AZUL_NOCHE, "titulo": "SIA IES 11", "cssOcultar": CSS_OCULTAR_CLOUD}
+    script = _SCRIPT % {"datos": json.dumps(datos)}
     try:
         # Se ejecuta en la página principal (Streamlit 1.4x+).
         st.html(script, unsafe_allow_javascript=True)
