@@ -108,8 +108,22 @@ h1, h2, h3, h4 {{ letter-spacing: -0.015em; font-weight: 800 !important; }}
 .stApp, [data-testid="stAppViewContainer"] {{
   background: var(--sia-bg-grad), var(--sia-bg) !important; color: var(--sia-ink);
 }}
-[data-testid="stHeader"] {{ background: transparent !important; }}
-[data-testid="stToolbar"] button, [data-testid="stHeader"] button {{ color: var(--sia-ink) !important; }}
+/* ---------- Encabezado nativo oculto (menú ⋮, Share, GitHub, Deploy) ----------
+   Se usa `visibility` y no `display: none` porque el botón que abre la barra lateral en celulares
+   (stExpandSidebarButton) vive dentro de este encabezado: con display:none quedaría inaccesible y no se
+   podría cerrar sesión ni cambiar el tema desde el teléfono. visibility:hidden oculta y desactiva todo,
+   y el botón de la barra lateral se vuelve a mostrar explícitamente. */
+header[data-testid="stHeader"] {{ visibility: hidden !important; background: transparent !important; box-shadow: none !important; }}
+[data-testid="stToolbarActions"], [data-testid="stMainMenu"], #MainMenu, [data-testid="stAppDeployButton"],
+.stDeployButton, [data-testid="stDecoration"], [data-testid="stStatusWidget"] {{ display: none !important; }}
+#MainMenu {{ visibility: hidden !important; }}
+footer {{ visibility: hidden !important; }}
+[data-testid="stExpandSidebarButton"] {{
+  visibility: visible !important; color: #FFFFFF !important; border-radius: 14px !important;
+  background: linear-gradient(135deg, var(--sia-primary), var(--sia-primary-2)) !important;
+  box-shadow: var(--sia-shadow) !important;
+}}
+[data-testid="stExpandSidebarButton"] * {{ color: #FFFFFF !important; }}
 .block-container {{ padding-top: 1.4rem; padding-bottom: 2.5rem; max-width: 1400px; }}
 section[data-testid="stSidebar"] {{ background: var(--sia-surface) !important; border-right: 1px solid var(--sia-border); }}
 section[data-testid="stSidebar"] * {{ color: var(--sia-ink); }}
@@ -566,10 +580,15 @@ def estilo_plotly(fig, alto: int = 360):
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         height=alto,
-        margin=dict(l=10, r=10, t=48, b=10),
+        # Título arriba de todo y leyenda justo sobre el área del gráfico: quedan en alturas distintas y no
+        # se pisan. La leyenda va alineada a la izquierda para que en celulares se parta en varias filas
+        # dentro del ancho (alineada a la derecha se salía del gráfico por la izquierda).
+        title=dict(x=0, xanchor="left", yref="container", y=0.97, yanchor="top"),
+        margin=dict(l=10, r=10, t=82, b=40),
         font=dict(family="Plus Jakarta Sans, Inter, Nunito, sans-serif", size=13, color=texto),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
-                    font=dict(color=texto), title=dict(font=dict(color=texto)), bgcolor="rgba(0,0,0,0)"),
+                    title_text="",  # sin título flotante ("Riesgo", "materia") que choque con el título
+                    font=dict(color=texto), bgcolor="rgba(0,0,0,0)"),
         title_font=dict(size=15, color=texto),
         hoverlabel=dict(bgcolor=AZUL_OSCURO if oscuro else "#FFFFFF", font=dict(color=texto),
                         bordercolor=LAVANDA),
@@ -583,4 +602,7 @@ def estilo_plotly(fig, alto: int = 360):
     fig.update_yaxes(**ejes)
     fig.update_annotations(font_color=texto)
     fig.update_coloraxes(colorbar_tickfont_color=texto, colorbar_title_font_color=texto)
+    titulo = fig.layout.title.text
+    if titulo and not titulo.startswith("<b>"):
+        fig.update_layout(title_text=f"<b>{titulo}</b>")
     return fig

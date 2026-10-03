@@ -459,12 +459,13 @@ def _tab_sabana(materia: Materia, materias: list[Materia]) -> None:
     mapa = mapa.loc[mapa.mean(axis=1).sort_values().index]
     fig = px.imshow(
         mapa, color_continuous_scale=[[0, "#E58FA0"], [1, AZUL]], zmin=0, zmax=1, aspect="auto",
-        title="Mapa de calor (azul = presente, rosa = ausente, vacío = no inscripto)",
+        title="Mapa de calor de asistencia",
         labels={"x": "Clase", "y": "", "color": "Presente"},
     )
     fig.update_coloraxes(showscale=False)
     fig.update_traces(xgap=2, ygap=2, hovertemplate="%{y}<br>%{x}: %{z}<extra></extra>")
     st.plotly_chart(estilo_plotly(fig, alto=max(320, 26 * len(mapa) + 120)), width="stretch")
+    st.caption("Azul = presente · rosa = ausente · vacío = todavía no inscripto en esa fecha.")
 
     ranking = prediccion.sort_values("pct_asistencia", ascending=False)
     ranking = ranking.assign(etiqueta=ranking["alumno"] + (" · " + ranking["materia"] if multi else ""))
