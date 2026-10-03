@@ -496,7 +496,7 @@ def hero(titulo: str, subtitulo: str = "") -> None:
 def footer() -> None:
     st.markdown(
         f'<div class="sia-footer">{logo_tech_html()}'
-        f'<span>Desarrollado por <b>{EQUIPO}</b> — {_html(INSTITUCION_CORTA)}</span></div>',
+        f'<span> <b>{EQUIPO}</b> — {_html(INSTITUCION_CORTA)}</span></div>',
         unsafe_allow_html=True,
     )
 

@@ -103,7 +103,7 @@ def _sidebar_pie(persona) -> None:
             auth.cerrar_sesion("Cerraste sesión correctamente.")
             st.rerun()
         st.caption(f"La sesión expira tras {auth.MINUTOS_INACTIVIDAD} min de inactividad.")
-        st.caption("Desarrollado por **Tech Innovation Team** — IES N° 11")
+        st.caption("**Tech & Innovation Team** — IES N° 11")
 
 
 def main() -> None:
