@@ -10,7 +10,7 @@ import pandas as pd
 from core import security
 from core.database import get_connection
 from core.tiempo import ahora_iso, hoy
-from core.validaciones import errores_materia, limpiar
+from core.validaciones import DIAS_SEMANA, describir_horario, error_pdf, errores_materia, limpiar
 
 _ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 _CODIGO_RE = re.compile(r"^SIA-[A-Z0-9]{6}$")
@@ -32,11 +32,21 @@ class Materia:
         curso: str = "",
         turno: str = "",
         dia_horario: str = "",
+        comision: str = "",
+        dias: str = "",
+        hora_inicio: str = "",
+        hora_fin: str = "",
     ) -> None:
         self._id = id
         self._curso = curso
+        self._comision = comision
         self._turno = turno
-        self._dia_horario = dia_horario
+        self._dias = [d for d in (dias or "").split(",") if d]
+        self._hora_inicio = hora_inicio
+        self._hora_fin = hora_fin
+        # Texto de días/horario: derivado de los campos estructurados; en materias creadas antes de que
+        # existieran se conserva el texto libre original.
+        self._dia_horario = describir_horario(self._dias, hora_inicio, hora_fin) or dia_horario
         self._nombre = nombre
         self._descripcion = descripcion
         self._docente_id = docente_id
@@ -74,8 +84,28 @@ class Materia:
         return self._curso
 
     @property
+    def comision(self) -> str:
+        return self._comision
+
+    @property
+    def curso_comision(self) -> str:
+        return " - ".join(p for p in (self._curso, self._comision) if p)
+
+    @property
     def turno(self) -> str:
         return self._turno
+
+    @property
+    def dias(self) -> list[str]:
+        return list(self._dias)
+
+    @property
+    def hora_inicio(self) -> str:
+        return self._hora_inicio
+
+    @property
+    def hora_fin(self) -> str:
+        return self._hora_fin
 
     @property
     def dia_horario(self) -> str:
@@ -114,6 +144,7 @@ class Materia:
             fila["id"], fila["nombre"], fila["descripcion"], fila["docente_id"],
             fila["codigo_clase"], fila["umbral"], fila["activa"],
             fila["curso"], fila["turno"], fila["dia_horario"],
+            fila["comision"], fila["dias"], fila["hora_inicio"], fila["hora_fin"],
         )
 
     @staticmethod
@@ -137,39 +168,46 @@ class Materia:
         return t if _CODIGO_RE.match(t) else None
 
     @staticmethod
-    def _validar(nombre: str, curso: str, turno: str | None, dia_horario: str, umbral: float) -> None:
-        errores = errores_materia(nombre, curso, turno, dia_horario)
+    def _normalizar(datos: dict) -> dict:
+        """Valida y limpia los datos de cursada; lanza ValueError con todos los errores juntos."""
+        dias = [d for d in DIAS_SEMANA if d in (datos.get("dias") or [])]
+        umbral = float(datos.get("umbral", 75))
+        errores = errores_materia(datos.get("nombre", ""), datos.get("curso"), datos.get("comision"),
+                                  datos.get("turno"), dias, datos.get("hora_inicio"), datos.get("hora_fin"))
         if not 0 <= umbral <= 100:
             errores.append("El umbral debe estar entre 0 y 100.")
         if errores:
             raise ValueError("\n".join(errores))
+        return {
+            "nombre": limpiar(datos["nombre"], 120),
+            "descripcion": (datos.get("descripcion") or "").strip()[:500],
+            "curso": datos["curso"],
+            "comision": datos["comision"],
+            "turno": datos["turno"],
+            "dias": ",".join(dias),
+            "hora_inicio": datos["hora_inicio"],
+            "hora_fin": datos["hora_fin"],
+            "dia_horario": describir_horario(dias, datos["hora_inicio"], datos["hora_fin"]),
+            "umbral": umbral,
+        }
 
     @classmethod
-    def crear(
-        cls,
-        nombre: str,
-        descripcion: str,
-        docente_id: int,
-        umbral: float = 75.0,
-        curso: str = "",
-        turno: str = "",
-        dia_horario: str = "",
-    ) -> "Materia":
-        cls._validar(nombre, curso, turno, dia_horario, umbral)
-        nombre, curso, dia_horario = limpiar(nombre, 120), limpiar(curso, 80), limpiar(dia_horario, 120)
-        descripcion = (descripcion or "").strip()[:500]
+    def crear(cls, docente_id: int, **datos) -> "Materia":
+        """datos: nombre, descripcion, curso, comision, turno, dias (lista), hora_inicio, hora_fin, umbral."""
+        d = cls._normalizar(datos)
         for _ in range(10):
             codigo = cls._generar_codigo()
             try:
                 with get_connection() as conn:
                     cur = conn.execute(
-                        """INSERT INTO materias (nombre, descripcion, curso, turno, dia_horario,
-                                                 docente_id, codigo_clase, umbral, creado_en)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (nombre, descripcion, curso, turno, dia_horario, docente_id, codigo, umbral, ahora_iso()),
+                        """INSERT INTO materias (nombre, descripcion, curso, comision, turno, dias, hora_inicio,
+                                                 hora_fin, dia_horario, docente_id, codigo_clase, umbral, creado_en)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (d["nombre"], d["descripcion"], d["curso"], d["comision"], d["turno"], d["dias"],
+                         d["hora_inicio"], d["hora_fin"], d["dia_horario"], docente_id, codigo, d["umbral"],
+                         ahora_iso()),
                     )
-                return cls(cur.lastrowid, nombre, descripcion, docente_id, codigo, umbral, True,
-                           curso, turno, dia_horario)
+                return cls.obtener(cur.lastrowid)
             except sqlite3.IntegrityError:
                 continue
         raise RuntimeError("No se pudo generar un código de clase único.")
@@ -210,20 +248,47 @@ class Materia:
         return [cls._desde_fila(f) for f in filas]
 
     # ----- gestión -----
-    def actualizar(
-        self, nombre: str, descripcion: str, umbral: float, curso: str, turno: str, dia_horario: str
-    ) -> None:
-        self._validar(nombre, curso, turno, dia_horario, umbral)
-        nombre, curso, dia_horario = limpiar(nombre, 120), limpiar(curso, 80), limpiar(dia_horario, 120)
-        descripcion = (descripcion or "").strip()[:500]
+    def actualizar(self, **datos) -> None:
+        d = self._normalizar(datos)
         with get_connection() as conn:
             conn.execute(
-                """UPDATE materias SET nombre = ?, descripcion = ?, umbral = ?, curso = ?, turno = ?,
-                                       dia_horario = ? WHERE id = ?""",
-                (nombre, descripcion, umbral, curso, turno, dia_horario, self._id),
+                """UPDATE materias SET nombre = ?, descripcion = ?, umbral = ?, curso = ?, comision = ?, turno = ?,
+                                       dias = ?, hora_inicio = ?, hora_fin = ?, dia_horario = ? WHERE id = ?""",
+                (d["nombre"], d["descripcion"], d["umbral"], d["curso"], d["comision"], d["turno"], d["dias"],
+                 d["hora_inicio"], d["hora_fin"], d["dia_horario"], self._id),
             )
-        self._nombre, self._descripcion, self._umbral = nombre, descripcion, float(umbral)
-        self._curso, self._turno, self._dia_horario = curso, turno, dia_horario
+        actualizada = Materia.obtener(self._id)
+        self.__dict__.update(actualizada.__dict__)
+
+    # ----- programa de la materia (PDF) -----
+    def guardar_programa(self, nombre: str, contenido: bytes) -> None:
+        error = error_pdf(nombre, contenido)
+        if error:
+            raise ValueError(error)
+        with get_connection() as conn:
+            conn.execute(
+                """INSERT INTO materia_programas (materia_id, nombre, contenido, subido_en) VALUES (?, ?, ?, ?)
+                   ON CONFLICT (materia_id) DO UPDATE SET nombre = excluded.nombre,
+                       contenido = excluded.contenido, subido_en = excluded.subido_en""",
+                (self._id, limpiar(nombre, 150), sqlite3.Binary(contenido), ahora_iso()),
+            )
+
+    def programa(self) -> tuple[str, bytes] | None:
+        with get_connection() as conn:
+            fila = conn.execute(
+                "SELECT nombre, contenido FROM materia_programas WHERE materia_id = ?", (self._id,)
+            ).fetchone()
+        return (fila["nombre"], bytes(fila["contenido"])) if fila else None
+
+    def tiene_programa(self) -> bool:
+        with get_connection() as conn:
+            return conn.execute(
+                "SELECT 1 FROM materia_programas WHERE materia_id = ?", (self._id,)
+            ).fetchone() is not None
+
+    def borrar_programa(self) -> None:
+        with get_connection() as conn:
+            conn.execute("DELETE FROM materia_programas WHERE materia_id = ?", (self._id,))
 
     def regenerar_codigo(self) -> str:
         for _ in range(10):

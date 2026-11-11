@@ -13,7 +13,7 @@ from typing import Iterator
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = Path(os.environ.get("SIA_DB_PATH", BASE_DIR / "database.db"))
-SCHEMA_VERSION = "2"
+SCHEMA_VERSION = "3"
 
 TABLAS = (
     "config",
@@ -23,6 +23,8 @@ TABLAS = (
     "clases",
     "asistencias",
     "intentos_login",
+    "materia_programas",
+    "clase_reportes",
 )
 
 SCHEMA = """
@@ -51,7 +53,11 @@ CREATE TABLE IF NOT EXISTS materias (
     nombre       TEXT NOT NULL,
     descripcion  TEXT NOT NULL DEFAULT '',
     curso        TEXT NOT NULL DEFAULT '',
+    comision     TEXT NOT NULL DEFAULT '',
     turno        TEXT NOT NULL DEFAULT '',
+    dias         TEXT NOT NULL DEFAULT '',
+    hora_inicio  TEXT NOT NULL DEFAULT '',
+    hora_fin     TEXT NOT NULL DEFAULT '',
     dia_horario  TEXT NOT NULL DEFAULT '',
     docente_id   INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
     codigo_clase TEXT NOT NULL UNIQUE,
@@ -103,6 +109,21 @@ CREATE INDEX IF NOT EXISTS idx_asist_estudiante ON asistencias(estudiante_id);
 CREATE INDEX IF NOT EXISTS idx_clases_materia   ON clases(materia_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_insc_estudiante  ON inscripciones(estudiante_id);
 CREATE INDEX IF NOT EXISTS idx_login            ON intentos_login(identificador, momento);
+
+-- Programa de la materia (PDF opcional). Tabla aparte para no cargar el archivo al listar materias.
+CREATE TABLE IF NOT EXISTS materia_programas (
+    materia_id INTEGER PRIMARY KEY REFERENCES materias(id) ON DELETE CASCADE,
+    nombre     TEXT NOT NULL,
+    contenido  BLOB NOT NULL,
+    subido_en  TEXT NOT NULL
+);
+
+-- Reporte PDF generado al cerrar cada clase (para Preceptoría).
+CREATE TABLE IF NOT EXISTS clase_reportes (
+    clase_id   INTEGER PRIMARY KEY REFERENCES clases(id) ON DELETE CASCADE,
+    pdf        BLOB NOT NULL,
+    generado_en TEXT NOT NULL
+);
 """
 
 
@@ -133,7 +154,11 @@ def get_connection() -> Iterator[sqlite3.Connection]:
 _MIGRACIONES = {
     "materias": {
         "curso": "TEXT NOT NULL DEFAULT ''",
+        "comision": "TEXT NOT NULL DEFAULT ''",
         "turno": "TEXT NOT NULL DEFAULT ''",
+        "dias": "TEXT NOT NULL DEFAULT ''",
+        "hora_inicio": "TEXT NOT NULL DEFAULT ''",
+        "hora_fin": "TEXT NOT NULL DEFAULT ''",
         "dia_horario": "TEXT NOT NULL DEFAULT ''",
     },
 }

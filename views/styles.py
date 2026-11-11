@@ -224,7 +224,7 @@ hr {{ border-color: var(--sia-border) !important; }}
 
 /* ---------- Pestañas tipo píldora ---------- */
 .stTabs [role="tablist"], .stTabs [data-baseweb="tab-list"] {{
-  gap: .5rem; overflow-x: auto; scrollbar-width: thin; padding: .35rem; border-radius: 25px;
+  gap: .5rem; flex-wrap: wrap; overflow-x: visible !important; padding: .35rem; border-radius: 25px;
   background: var(--sia-surface); border: 1px solid var(--sia-border); box-shadow: var(--sia-shadow);
 }}
 .stTabs [role="tab"], .stTabs [data-baseweb="tab"] {{
@@ -238,6 +238,7 @@ hr {{ border-color: var(--sia-border) !important; }}
 }}
 .stTabs [role="tab"][aria-selected="true"] p {{ color: #FFFFFF !important; font-weight: 800 !important; }}
 .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {{ display: none !important; }}
+.stTabs [role="tablist"] > button[aria-hidden="true"], .stTabs [data-testid="stTabScrollButton"] {{ display: none !important; }}
 
 /* ---------- Componentes SIA ---------- */
 .sia-hero {{
@@ -328,6 +329,74 @@ hr {{ border-color: var(--sia-border) !important; }}
   display: inline-flex; align-items: center; justify-content: center; font-size: .7rem; font-weight: 800; color: #fff;
   background: linear-gradient(135deg, {azul}, {lila});
 }}
+
+/* ---------- Tablas responsivas (sin scroll horizontal) ---------- */
+.sia-tabla {{ width: 100%; max-width: 100%; margin: .3rem 0 1rem; }}
+.sia-tabla table {{
+  width: 100%; border-collapse: separate; border-spacing: 0; background: var(--sia-surface);
+  border: 1px solid var(--sia-border); border-radius: 14px; overflow: hidden; box-shadow: var(--sia-shadow);
+  table-layout: auto; font-size: .88rem;
+}}
+.sia-tabla th {{
+  background: var(--sia-surface-2); color: var(--sia-ink); text-align: left; font-weight: 700;
+  padding: .55rem .7rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em;
+}}
+.sia-tabla td {{
+  padding: .5rem .7rem; color: var(--sia-ink); border-top: 1px solid var(--sia-border);
+  overflow-wrap: anywhere; word-break: break-word; vertical-align: top;
+}}
+.sia-tabla tr:nth-child(even) td {{ background: color-mix(in srgb, var(--sia-surface-2) 45%, transparent); }}
+.sia-tabla .sia-vacio {{ color: var(--sia-muted); }}
+.sia-mini-barra {{ height: 6px; border-radius: 999px; background: var(--sia-surface-2); margin-top: .3rem; overflow: hidden; }}
+.sia-mini-barra > div {{ height: 100%; border-radius: 999px; background: var(--tono); }}
+@media (max-width: 640px) {{
+  .sia-tabla table, .sia-tabla tbody, .sia-tabla tr, .sia-tabla td {{ display: block; width: 100%; }}
+  .sia-tabla table {{ border: none; box-shadow: none; background: transparent; }}
+  .sia-tabla thead {{ display: none; }}
+  .sia-tabla tr {{
+    background: var(--sia-surface); border: 1px solid var(--sia-border); border-radius: 14px;
+    margin-bottom: .55rem; padding: .35rem .2rem; box-shadow: var(--sia-shadow);
+  }}
+  .sia-tabla tr:nth-child(even) td {{ background: transparent; }}
+  .sia-tabla td {{ border-top: none; padding: .25rem .7rem; display: flex; gap: .6rem; }}
+  .sia-tabla td::before {{
+    content: attr(data-label); flex: 0 0 38%; color: var(--sia-muted); font-size: .75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .03em;
+  }}
+}}
+
+/* ---------- Historial de asistencia (íconos que se acomodan, sin matriz ancha) ---------- */
+.sia-hist {{ display: grid; gap: .55rem; margin: .4rem 0 1rem; }}
+.sia-hist-fila {{
+  display: grid; grid-template-columns: minmax(150px, 230px) 1fr; gap: .4rem .9rem; align-items: center;
+  background: var(--sia-surface); border: 1px solid var(--sia-border); border-radius: 14px;
+  padding: .6rem .8rem; box-shadow: var(--sia-shadow);
+}}
+.sia-hist-nombre b {{ color: var(--sia-ink); font-size: .92rem; overflow-wrap: anywhere; }}
+.sia-hist-nombre small {{ display: block; color: var(--sia-muted); font-size: .78rem; }}
+.sia-hist-marcas {{ display: flex; flex-wrap: wrap; gap: .3rem; min-width: 0; }}
+.sia-marca {{
+  display: inline-flex; flex-direction: column; align-items: center; min-width: 2.6rem; padding: .15rem .25rem;
+  border-radius: 9px; background: var(--sia-surface-2); font-size: .95rem; line-height: 1.1;
+}}
+.sia-marca small {{ font-size: .62rem; color: var(--sia-muted); }}
+.sia-marca.ausente {{ background: color-mix(in srgb, #D9534F 16%, transparent); }}
+@media (max-width: 640px) {{
+  .sia-hist-fila {{ grid-template-columns: 1fr; }}
+}}
+
+/* ---------- Banner de alerta de riesgo ---------- */
+.sia-riesgo {{
+  display: flex; gap: .8rem; align-items: flex-start; border-radius: 16px; padding: .85rem 1rem; margin-bottom: 1rem;
+  background: color-mix(in srgb, #D9534F 12%, var(--sia-surface)); border: 1px solid color-mix(in srgb, #D9534F 45%, transparent);
+  border-left: 7px solid #D9534F; box-shadow: var(--sia-shadow); color: var(--sia-ink); overflow-wrap: anywhere;
+}}
+.sia-riesgo.medio {{ background: color-mix(in srgb, #D99A2B 12%, var(--sia-surface));
+  border-color: color-mix(in srgb, #D99A2B 45%, transparent); border-left-color: #D99A2B; }}
+.sia-riesgo .icono {{ font-size: 1.6rem; line-height: 1; }}
+.sia-riesgo b {{ color: var(--sia-ink); }}
+.sia-riesgo ul {{ margin: .3rem 0 0 1rem; padding: 0; }}
+.sia-riesgo li {{ margin: .1rem 0; color: var(--sia-ink); font-size: .9rem; }}
 
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {{
@@ -528,7 +597,7 @@ def logo_tech_html() -> str:
     uri = _img(ruta_logo_tech(), 96)
     if uri:
         return f'<img src="{uri}" alt="Logo {EQUIPO}">'
-    return f'<span class="sia-tech-placeholder" title="Agregá assets/logo_tech.png">TI</span>'
+    return '<span class="sia-tech-placeholder" title="Agregá assets/logo_tech.png">TI</span>'
 
 
 def marca_sidebar() -> None:
@@ -619,6 +688,76 @@ def aviso_camara(texto: str) -> None:
 
 def mostrar_errores(errores: list[str]) -> None:
     st.error("**Revisá el formulario:**\n" + "\n".join(f"- {e}" for e in errores), icon="⚠️")
+
+
+class Html(str):
+    """Marca un fragmento HTML ya seguro para insertarlo sin escapar en `tabla_html`."""
+
+
+def _celda(valor) -> str:
+    if isinstance(valor, Html):
+        return str(valor)
+    if valor is None or (isinstance(valor, float) and valor != valor):
+        return '<span class="sia-vacio">—</span>'
+    return escape(str(valor))
+
+
+def tabla_html(filas: list[dict], columnas: dict[str, str], vacio: str = "Sin datos.") -> None:
+    """Tabla responsiva: en celulares cada fila se vuelve una tarjeta (nunca hay scroll horizontal).
+
+    `columnas` mapea clave -> título. Los valores se escapan, salvo los envueltos en `Html(...)`.
+    """
+    if not filas:
+        st.markdown(f'<div class="sia-tabla"><span class="sia-vacio">{escape(vacio)}</span></div>',
+                    unsafe_allow_html=True)
+        return
+    cabecera = "".join(f"<th>{escape(t)}</th>" for t in columnas.values())
+    cuerpo = "".join(
+        "<tr>" + "".join(f'<td data-label="{escape(t)}">{_celda(fila.get(k))}</td>' for k, t in columnas.items())
+        + "</tr>"
+        for fila in filas
+    )
+    st.markdown(f'<div class="sia-tabla"><table><thead><tr>{cabecera}</tr></thead><tbody>{cuerpo}</tbody></table></div>',
+                unsafe_allow_html=True)
+
+
+def mini_barra(pct: float, tono: str) -> Html:
+    color = TONOS.get(tono, tono)
+    return Html(f'{pct:.0f}%<div class="sia-mini-barra" style="--tono:{color}">'
+                f'<div style="width:{max(0, min(100, pct)):.0f}%"></div></div>')
+
+
+SIMBOLOS_ESTADO = {"presente": "✅", "tarde": "🕒", "justificado": "📝", "ausente": "❌"}
+
+
+def grilla_historial(grupos: list[tuple[str, str, float, str, list[tuple[str, str]]]]) -> None:
+    """Historial de asistencia sin matriz ancha.
+
+    grupos: (título, subtítulo, porcentaje, tono, [(fecha ISO, estado), ...]). Cada clase es un ícono con su
+    fecha; los íconos pasan a la línea siguiente cuando no entran.
+    """
+    filas = []
+    for titulo, subtitulo, pct, tono, marcas in grupos:
+        iconos = "".join(
+            f'<span class="sia-marca {escape(estado)}" title="{escape(fecha)} · {escape(estado)}">'
+            f'{SIMBOLOS_ESTADO.get(estado, "·")}<small>{escape(fecha[8:10])}/{escape(fecha[5:7])}</small></span>'
+            for fecha, estado in marcas
+        )
+        filas.append(
+            f'<div class="sia-hist-fila"><div class="sia-hist-nombre"><b>{escape(titulo)}</b>'
+            f'<small>{escape(subtitulo)}</small>{mini_barra(pct, tono)}</div>'
+            f'<div class="sia-hist-marcas">{iconos}</div></div>'
+        )
+    st.markdown(f'<div class="sia-hist">{"".join(filas)}</div>', unsafe_allow_html=True)
+
+
+def banner_riesgo(titulo: str, items: list[str], nivel: str = "alto") -> None:
+    """Alerta visual destacada (riesgo de perder la regularidad)."""
+    lista = "".join(f"<li>{escape(i)}</li>" for i in items)
+    clase = "sia-riesgo" + ("" if nivel == "alto" else " medio")
+    icono = "🚨" if nivel == "alto" else "⚠️"
+    st.markdown(f'<div class="{clase}" role="alert"><span class="icono">{icono}</span><div><b>{escape(titulo)}</b>'
+                f'<ul>{lista}</ul></div></div>', unsafe_allow_html=True)
 
 
 def tono_porcentaje(pct: float, umbral: float) -> str:

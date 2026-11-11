@@ -66,7 +66,7 @@ def usuario_actual() -> Persona | None:
 
 def render_acceso() -> None:
     hero(f"{TITULO_APP} · Sistema de Asistencia Inteligente",
-         f"{INSTITUCION} — asistencia por QR, sábana digital y analítica predictiva")
+         f"{INSTITUCION} — asistencia por QR, historial de asistencia y alertas de riesgo")
     mensaje_sesion = st.session_state.pop("aviso_sesion", None)
     if mensaje_sesion:
         st.warning(mensaje_sesion)

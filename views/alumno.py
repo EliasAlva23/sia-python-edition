@@ -1,4 +1,4 @@
-"""Panel del Estudiante: dar presente (QR/PIN), unirse a materias, sábana personal y credencial."""
+"""Panel del Estudiante: dar presente (QR/PIN), unirse a materias, Mi historial y credencial."""
 from __future__ import annotations
 
 import hashlib
@@ -9,17 +9,19 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from core.reportes import excel_bytes
 from models.asistencia import RegistroAsistencia, ResultadoMarcado
 from models.materia import Materia
 from models.persona import Estudiante
 from models.predictor_ia import PredictorRiesgoIA
 from utils.qr import decodificar_qr, generar_qr_png, interpretar_codigo
+from views.escaner import escaner_qr
 from views.styles import (
-    INSTITUCION_CORTA, TONOS, alerta, aviso_camara, chips, estilo_plotly, hero, kpi_grid, tarjeta_progreso, tono_porcentaje,
+    INSTITUCION_CORTA, TONOS, alerta, aviso_camara, banner_riesgo, chips, estilo_plotly, grilla_historial, hero,
+    kpi_grid, tabla_html, tarjeta_progreso, tono_porcentaje,
 )
 
 ICONOS_ESTADO = {"presente": "✅ Presente", "tarde": "🕒 Tarde", "justificado": "📝 Justificado", "ausente": "❌ Ausente"}
-SIMBOLOS = {"presente": "✅", "tarde": "🕒", "justificado": "📝", "ausente": "❌"}
 METODOS = {"qr_credencial": "QR credencial", "qr_clase": "QR de clase", "pin": "PIN", "manual": "Manual"}
 MINUTOS_ENLACE = 10
 
@@ -31,15 +33,16 @@ def render(estudiante: Estudiante) -> None:
 
     materias = Materia.de_estudiante(estudiante.id)
     df = Materia.registros_df([m.id for m in materias], estudiante_id=estudiante.id)
+    _banner_riesgo(materias, df)
     _resumen(materias, df)
 
-    tabs = st.tabs(["📷 Dar presente", "➕ Unirme a una materia", "📋 Mi sábana", "🪪 Mi credencial"])
+    tabs = st.tabs(["📷 Dar presente", "➕ Unirme a una materia", "📋 Mi historial", "🪪 Mi credencial"])
     with tabs[0]:
         _tab_presente(estudiante, materias)
     with tabs[1]:
         _tab_unirme(estudiante, materias)
     with tabs[2]:
-        _tab_sabana(materias, df, estudiante)
+        _tab_historial(materias, df, estudiante)
     with tabs[3]:
         _tab_credencial(estudiante)
 
@@ -133,28 +136,60 @@ AVISO_CAMARA_CODIGO = (
 )
 
 
-def _escaner(clave: str, etiqueta: str, estudiante: Estudiante, aviso: str) -> None:
-    """Cámara bajo demanda (evita abrir varias cámaras a la vez en el celular)."""
+def _escaner(clave: str, estudiante: Estudiante, aviso: str) -> None:
+    """Cámara bajo demanda: escaneo en vivo con selector de cámara; foto como alternativa."""
     if not st.toggle("📷 Activar cámara", key=f"activar_{clave}"):
-        st.caption("Activá la cámara y sacá una foto nítida del QR (en el celular podés cambiar a la cámara trasera).")
+        st.caption("Activá la cámara y apuntá al QR: se lee solo, sin sacar foto. "
+                   "Si tenés varias cámaras, elegí la correcta en la lista.")
         return
     aviso_camara(aviso)
-    foto = st.camera_input(etiqueta, key=f"cam_{clave}")
-    if foto is None:
-        return
-    huella = hashlib.sha256(foto.getvalue()).hexdigest()
-    if st.session_state.get(f"huella_{clave}") == huella:
-        return  # Streamlit reenvía la misma foto en cada rerun: solo procesamos fotos nuevas.
-    st.session_state[f"huella_{clave}"] = huella
-    textos = decodificar_qr(foto.getvalue())
-    _guardar_resultado(
-        procesar_entrada(textos[0], estudiante) if textos
-        else ResultadoMarcado(False, "error", "No se detectó un QR. Acercate, evitá reflejos y volvé a intentar.")
-    )
-    st.rerun()
+    texto = escaner_qr(f"alumno_{clave}", perfil="alumno")
+    if texto:
+        _guardar_resultado(procesar_entrada(texto, estudiante))
+        st.rerun()
+    with st.expander("¿No lee en vivo? Sacá una foto del QR"):
+        foto = st.camera_input("Foto del QR", key=f"cam_{clave}")
+        if foto is None:
+            return
+        huella = hashlib.sha256(foto.getvalue()).hexdigest()
+        if st.session_state.get(f"huella_{clave}") == huella:
+            return  # Streamlit reenvía la misma foto en cada rerun: solo procesamos fotos nuevas.
+        st.session_state[f"huella_{clave}"] = huella
+        textos = decodificar_qr(foto.getvalue())
+        _guardar_resultado(
+            procesar_entrada(textos[0], estudiante) if textos
+            else ResultadoMarcado(False, "error", "No se detectó un QR. Acercate, evitá reflejos y volvé a intentar.")
+        )
+        st.rerun()
 
 
-# ---------------------------------------------------------------- resumen
+# ---------------------------------------------------------------- resumen y alerta de riesgo
+def _situacion(materia: Materia, df: pd.DataFrame) -> tuple[pd.DataFrame, dict, int]:
+    sub = df[df["materia_id"] == materia.id].sort_values("fecha")
+    features = PredictorRiesgoIA.extraer_features(sub["presente"].tolist())
+    faltan = PredictorRiesgoIA.clases_para_recuperar(int(sub["presente"].sum()), len(sub), materia.umbral)
+    return sub, features, faltan
+
+
+def _banner_riesgo(materias: list[Materia], df: pd.DataFrame) -> None:
+    """Alerta automática arriba del panel cuando la regularidad está en peligro."""
+    altos, medios = [], []
+    for materia in materias:
+        sub, f, faltan = _situacion(materia, df)
+        if sub.empty:
+            continue
+        if faltan:
+            altos.append(f"{materia.nombre}: {f['pct_asistencia']:.0f}% de asistencia (mínimo {materia.umbral:.0f}%). "
+                         f"Necesitás asistir a las próximas {faltan} clases seguidas.")
+        elif f["racha_actual"] >= 2 or f["max_consecutivas"] >= 3:
+            medios.append(f"{materia.nombre}: llevás {f['racha_actual']} faltas seguidas "
+                          f"(máximo {f['max_consecutivas']}). Cuidá la regularidad.")
+    if altos:
+        banner_riesgo("Alerta de riesgo: podés perder la regularidad", altos + medios)
+    elif medios:
+        banner_riesgo("Atención a tus faltas", medios, nivel="medio")
+
+
 def _resumen(materias: list[Materia], df: pd.DataFrame) -> None:
     total = len(df)
     presentes = int(df["presente"].sum()) if total else 0
@@ -182,7 +217,7 @@ def _tab_presente(estudiante: Estudiante, materias: list[Materia]) -> None:
         with st.container(border=True):
             st.markdown("##### 📷 Escanear QR de la clase")
             st.caption("También podés escanearlo con la cámara del celular: abre la app y registra tu presente.")
-            _escaner("presente", "Apuntá al QR que proyecta tu docente", estudiante, AVISO_CAMARA_PIN)
+            _escaner("presente", estudiante, AVISO_CAMARA_PIN)
     with col_pin:
         with st.form("form_pin", clear_on_submit=True):
             st.markdown("##### 🔢 ¿Falla la cámara? Ingresá el PIN")
@@ -213,7 +248,7 @@ def _tab_unirme(estudiante: Estudiante, materias: list[Materia]) -> None:
                     st.rerun()
         with st.container(border=True):
             st.markdown("##### 📷 o escaneá el QR de inscripción")
-            _escaner("unirme", "Apuntá al QR de inscripción", estudiante, AVISO_CAMARA_CODIGO)
+            _escaner("unirme", estudiante, AVISO_CAMARA_CODIGO)
     with col_lista:
         st.markdown("##### 📚 Mis materias")
         if not materias:
@@ -223,37 +258,38 @@ def _tab_unirme(estudiante: Estudiante, materias: list[Materia]) -> None:
             estado = "🟢 Clase abierta hoy" if clase and clase["abierta"] else "⚪ Sin clase abierta"
             st.markdown(
                 f'<div class="sia-card"><b>{escape(materia.nombre)}</b>'
-                f'{chips([f"🎓 {materia.curso}", f"🕑 {materia.turno}", f"🗓️ {materia.dia_horario}"])}'
+                f'{chips([f"🎓 {materia.curso_comision}", f"🕑 {materia.turno}", f"🗓️ {materia.dia_horario}"])}'
                 f'<span class="muted">{estado}</span></div>',
                 unsafe_allow_html=True,
             )
+            programa = materia.programa()
+            if programa:
+                st.download_button(f"📄 Programa de {materia.nombre}", programa[1], file_name=programa[0],
+                                   mime="application/pdf", key=f"prog_alumno_{materia.id}", width="stretch")
 
 
-# ---------------------------------------------------------------- sábana personal
-def _tab_sabana(materias: list[Materia], df: pd.DataFrame, estudiante: Estudiante) -> None:
+# ---------------------------------------------------------------- Mi historial
+def _tab_historial(materias: list[Materia], df: pd.DataFrame, estudiante: Estudiante) -> None:
     if not materias:
-        st.info("Unite a una materia para ver tu sábana de asistencia.")
+        st.info("Unite a una materia para ver tu historial de asistencia.")
         return
     if df.empty:
         st.info("Todavía no se dictaron clases en tus materias.")
         return
 
     st.markdown("##### Porcentaje actual por materia")
-    tarjetas = []
-    avisos = []
+    tarjetas, avisos, grupos = [], [], []
     for materia in materias:
-        sub = df[df["materia_id"] == materia.id].sort_values("fecha")
+        sub, f, faltan = _situacion(materia, df)
         if sub.empty:
             tarjetas.append(tarjeta_progreso(materia.nombre, "—", "Sin clases todavía", 0, "gris"))
             continue
         p, n = int(sub["presente"].sum()), len(sub)
         pct = 100 * p / n
-        tarjetas.append(tarjeta_progreso(
-            materia.nombre, f"{pct:.0f}%", f"{p}/{n} clases · umbral {materia.umbral:.0f}%",
-            pct, tono_porcentaje(pct, materia.umbral),
-        ))
-        f = PredictorRiesgoIA.extraer_features(sub["presente"].tolist())
-        faltan = PredictorRiesgoIA.clases_para_recuperar(p, n, materia.umbral)
+        tono = tono_porcentaje(pct, materia.umbral)
+        tarjetas.append(tarjeta_progreso(materia.nombre, f"{pct:.0f}%", f"{p}/{n} clases · umbral {materia.umbral:.0f}%",
+                                         pct, tono))
+        grupos.append((materia.nombre, f"{p} de {n} clases", pct, tono, list(zip(sub["fecha"], sub["estado"], strict=True))))
         if faltan:
             avisos.append((f"{materia.nombre}: estás por debajo del umbral",
                            f"Necesitás asistir a las próximas {faltan} clases seguidas para recuperar la regularidad.",
@@ -266,15 +302,9 @@ def _tab_sabana(materias: list[Materia], df: pd.DataFrame, estudiante: Estudiant
     for aviso in avisos:
         alerta(*aviso)
 
-    st.markdown("##### 📋 Sábana personal")
-    st.caption("✅ presente · 🕒 tarde · 📝 justificado · ❌ ausente · — sin clase ese día")
-    sabana = (df.assign(marca=df["estado"].map(SIMBOLOS))
-                .pivot_table(index="materia", columns="fecha", values="marca", aggfunc="first")
-                .fillna("—"))
-    sabana.insert(0, "%", df.groupby("materia")["presente"].mean().mul(100).round(0))
-    st.dataframe(sabana, width="stretch", column_config={
-        "%": st.column_config.ProgressColumn("% asistencia", min_value=0, max_value=100, format="%.0f%%"),
-    })
+    st.markdown("##### 📋 Mi historial de asistencia")
+    st.caption("✅ presente · 🕒 tarde · 📝 justificado · ❌ ausente — cada ícono es una clase con su fecha.")
+    grilla_historial(grupos)
 
     serie = df.sort_values("fecha").copy()
     serie["acumulado"] = serie.groupby("materia")["presente"].transform(lambda s: s.expanding().mean() * 100)
@@ -285,22 +315,22 @@ def _tab_sabana(materias: list[Materia], df: pd.DataFrame, estudiante: Estudiant
     fig.update_yaxes(range=[0, 105])
     st.plotly_chart(estilo_plotly(fig), width="stretch")
 
-    with st.expander("🗂️ Historial detallado", expanded=False):
-        historial = df.sort_values("fecha", ascending=False).assign(
-            Estado=lambda d: d["estado"].map(ICONOS_ESTADO),
-            Método=lambda d: d["metodo"].map(METODOS).fillna("—"),
-            Hora=lambda d: d["registrado_en"].fillna("").str[11:16].replace("", "—"),
+    with st.expander("🗂️ Detalle clase por clase", expanded=False):
+        detalle = df.sort_values("fecha", ascending=False)
+        tabla_html(
+            [{"fecha": pd.to_datetime(f.fecha).strftime("%d/%m/%Y"), "materia": f.materia,
+              "estado": ICONOS_ESTADO.get(f.estado, f.estado),
+              "hora": f.registrado_en[11:16] if isinstance(f.registrado_en, str) else None}
+             for f in detalle.itertuples()],
+            {"fecha": "Fecha", "materia": "Materia", "estado": "Estado", "hora": "Hora"},
         )
-        st.dataframe(
-            historial[["fecha", "materia", "tema", "Estado", "Método", "Hora"]].rename(
-                columns={"fecha": "Fecha", "materia": "Materia", "tema": "Tema"}),
-            hide_index=True, width="stretch",
-        )
-        st.download_button(
-            "⬇️ Descargar mi historial (CSV)",
-            historial[["fecha", "materia", "tema", "estado", "metodo", "registrado_en"]].to_csv(index=False).encode("utf-8"),
-            file_name=f"mi_asistencia_{estudiante.dni}.csv", mime="text/csv",
-        )
+        exportar = detalle[["fecha", "materia", "tema", "estado", "metodo", "registrado_en"]]
+        c1, c2 = st.columns(2)
+        c1.download_button("⬇️ Mi historial (CSV)", exportar.to_csv(index=False).encode("utf-8-sig"),
+                           file_name=f"mi_historial_{estudiante.dni}.csv", mime="text/csv", width="stretch")
+        c2.download_button("⬇️ Mi historial (Excel)", excel_bytes({"Mi historial": exportar}),
+                           file_name=f"mi_historial_{estudiante.dni}.xlsx", width="stretch",
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 # ---------------------------------------------------------------- credencial
@@ -320,8 +350,9 @@ def _tab_credencial(estudiante: Estudiante) -> None:
             f'<div class="muted">{escape(estudiante.email)}</div></div>',
             unsafe_allow_html=True,
         )
-        st.markdown("Mostrá este QR al docente para registrar tu presente. "
-                    "Está **firmado digitalmente**: no puede falsificarse cambiando el DNI.")
+        st.markdown("Mostrá este QR al docente para registrar tu presente. Es **fijo y firmado digitalmente**: "
+                    "no vence y no puede falsificarse cambiando el DNI. Subí el brillo de la pantalla para que "
+                    "la cámara lo lea más rápido.")
         st.code(payload, language=None, wrap_lines=True)
         st.download_button("⬇️ Descargar credencial (PNG)", generar_qr_png(payload, box_size=16),
                            file_name=f"credencial_sia_{estudiante.dni}.png", mime="image/png")

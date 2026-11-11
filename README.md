@@ -5,24 +5,28 @@ Instituto de Educación Superior N° 11.
 Aplicación web en **Streamlit** para la relación Docente–Alumno: asistencia por QR,
 ciencia de datos con `pandas` + `plotly` y predicción de riesgo con **Random Forest** (`scikit-learn`).
 
+## Documentación
+
+En [`docs/`](docs/) están los informes oficiales, en Markdown y PDF:
+
+| Documento | Contenido |
+|---|---|
+| [Informe de Interfaces](docs/INFORME_INTERFACES.md) | Detalle de cada vista de los paneles de Alumno y Docente |
+| [PRD](docs/PRD.md) | Requisitos funcionales y técnicos del sistema |
+| [Arquitectura](docs/ARQUITECTURA.md) | Estructura de carpetas y archivos, modelo de datos, configuración y despliegue |
+
+Los PDF se regeneran con `python docs/generar_pdfs.py` (requiere `pip install markdown fpdf2`).
+
 ## Estructura
 
 ```
-app.py                      # punto de entrada (st.set_page_config wide + ruteo por rol)
-seed_init.py                # verifica / inicializa database.db (opcional: --crear-docente)
-core/
-  database.py               # SQLite (sqlite3): esquema, conexiones transaccionales
-  security.py               # PBKDF2-HMAC-SHA256 + salt, firmas HMAC, lectura de secrets
-  tiempo.py                 # fechas en zona horaria institucional
-models/
-  persona.py                # Persona (ABC) → Docente / Estudiante + RepositorioPersonas
-  materia.py                # Materia: inscripciones, clases, matriz y datos para análisis
-  asistencia.py             # RegistroAsistencia: tokens QR/PIN con idempotencia
-  predictor_ia.py           # PredictorRiesgoIA: Random Forest + fallback heurístico
-utils/qr.py                 # generación (qrcode) y lectura (OpenCV, respaldo pyzbar)
-views/                      # auth, panel docente, panel alumno, estilos CSS
-.streamlit/config.toml      # tema visual
-requirements.txt / packages.txt
+app.py              punto de entrada: página, sesión y ruteo por rol
+core/               base de datos, seguridad, validaciones, fechas, reportes PDF/Excel, Google Drive
+models/             Persona/Docente/Estudiante, Materia, RegistroAsistencia, PredictorRiesgoIA
+utils/qr.py         generación y lectura de códigos QR
+views/              paneles, escáner QR en vivo, exportaciones, PWA y estilos
+scripts/            autorización de Google Drive (se ejecuta una vez)
+docs/               informes del sistema (.md y .pdf)
 ```
 
 ## Identidad visual
@@ -42,8 +46,30 @@ Requiere `server.enableStaticServing = true` en `.streamlit/config.toml` (ya con
 
 ## Materias
 
-Cada materia exige **Curso / Comisión**, **Turno** (Mañana / Tarde / Noche) y **Día y horario**.
-Las bases creadas con la versión anterior se migran solas al iniciar (se agregan las columnas sin perder datos).
+Cada materia se carga con selectores: **Curso** (1° a 4° Año), **Comisión**, **Turno** (Mañana / Tarde / Noche),
+**Días de cursada** y horario **Desde / Hasta**, más una descripción opcional y el **programa en PDF** (hasta 8 MB),
+que los alumnos inscriptos pueden descargar. Las bases de versiones anteriores se migran solas al iniciar.
+
+## Escáner QR en vivo
+
+Docentes y alumnos escanean con la cámara **en vivo, sin sacar foto**, desde una webcam de PC o un celular:
+selector de cámara (se recuerda la elección), cámara trasera en celulares, decodificación nativa (`BarcodeDetector`)
+o jsQR en navegadores que no la traen (Chrome/Edge en Windows) y mensajes de error en español (permiso denegado,
+cámara ocupada por otra app, sin cámara). Quedan como alternativas la foto, el PIN y el ingreso manual o lector USB.
+
+## Cierre de clase y reportes
+
+- **Cerrar clase** genera automáticamente el **reporte PDF para Preceptoría** (resumen, listado y firmas); se
+  descarga al instante y queda guardado en el historial de clases.
+- **Historial de asistencia** (docente) y **Mi historial** (alumno) se exportan a CSV y Excel.
+- **Google Drive:** los reportes se pueden enviar a una carpeta institucional. Se configura en Secrets
+  (ver la plantilla `.streamlit/secrets.toml.example` y la sección Google Drive de `docs/ARQUITECTURA.md`).
+  Sin configurar, el botón aparece deshabilitado.
+
+## Alertas de riesgo
+
+Ambos paneles muestran automáticamente una alerta cuando un alumno puede perder la regularidad (bajo el umbral,
+faltas consecutivas o probabilidad de riesgo alta).
 
 ## QR con enlace real
 
@@ -77,8 +103,9 @@ Por cada alumno-materia se toman instantáneas parciales de su historial (primer
 etiquetan con el desenlace: el **resultado final que carga el docente** (aprobado / reprobado / abandono)
 o, si no existe, si terminó bajo el umbral o con ≥3 faltas consecutivas. Features: % asistencia,
 máx. faltas consecutivas, faltas en las últimas 4 clases, tendencia, racha actual y clases cursadas.
-La validación cruzada se agrupa por alumno para evitar fugas. Con menos de 30 instantáneas se usa un
-puntaje heurístico y la interfaz lo indica.
+La validación cruzada se agrupa por alumno para evitar fugas. Con poco historial (menos de 30 instantáneas) o sin contraste entre alumnos, el riesgo se calcula con
+**reglas de asistencia** (porcentaje, faltas seguidas y últimas clases) y la interfaz lo informa como
+«Análisis por reglas de asistencia».
 
 > Mientras no haya resultados finales cargados, las etiquetas se derivan de la propia asistencia,
 > por lo que el AUC reportado será optimista. Cargá los resultados al cierre de cada cursada

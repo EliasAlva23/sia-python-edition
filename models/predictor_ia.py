@@ -126,13 +126,15 @@ class PredictorRiesgoIA:
         if len(X) < self.MIN_MUESTRAS or len(np.unique(y)) < 2:
             if len(X) < self.MIN_MUESTRAS:
                 info["motivo"] = (
-                    f"Se necesitan al menos {self.MIN_MUESTRAS} instantáneas de historia (hay {len(X)}). "
-                    "Mientras tanto se usa un puntaje heurístico."
+                    f"Todavía hay poco historial para entrenar la IA ({len(X)} de {self.MIN_MUESTRAS} registros "
+                    "necesarios). Mientras tanto, el riesgo se calcula con reglas claras: porcentaje de asistencia, "
+                    "faltas seguidas y ausencias en las últimas clases."
                 )
             else:
                 info["motivo"] = (
-                    "Todos los alumnos tienen por ahora el mismo desenlace (todos regulares o todos en riesgo), "
-                    "así que no hay contraste para entrenar. Mientras tanto se usa un puntaje heurístico."
+                    "Por ahora todos los alumnos tienen la misma situación (todos regulares o todos en riesgo), así "
+                    "que la IA no tiene con qué comparar. Mientras tanto, el riesgo se calcula con reglas claras: "
+                    "porcentaje de asistencia, faltas seguidas y ausencias en las últimas clases."
                 )
             self._modelo, self._info = None, info
             return dict(info)
