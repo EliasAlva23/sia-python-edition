@@ -1,8 +1,8 @@
-# Arquitectura del Sistema — SIA · IES N° 11
+# Arquitectura del Sistema — SIA
 
-**Sistema de Asistencia Inteligente (Python Edition)**  
-Instituto de Educación Superior N° 11 · Tech & Innovation Team  
-Versión del documento: noviembre de 2026  
+**Sistema de Asistencia Inteligente — plataforma multi-institución**  
+Tech & Innovation Team · Institución inicial: Instituto de Educación Superior N° 11  
+Versión del documento: noviembre de 2026 (esquema de datos v4)  
 
 ---
 
@@ -12,9 +12,9 @@ SIA es una aplicación web en **Streamlit** organizada en cuatro capas:
 
 | Capa | Carpeta | Responsabilidad |
 |---|---|---|
-| Presentación | `views/` | Pantallas, componentes visuales, escáner QR, PWA y estilos. No accede a la base directamente. |
-| Dominio | `models/` | Clases de negocio (POO): personas, materias, asistencia y predictor de IA. |
-| Infraestructura | `core/` | Base de datos, seguridad, validaciones, fechas, reportes PDF/Excel y Google Drive. |
+| Presentación | `views/` | Paneles por perfil, componentes visuales, gráficos, escáner QR, PWA y estilos. |
+| Dominio | `models/` | Clases de negocio (POO): personas, instituciones, materias, asistencia, justificativos y predictor de IA. |
+| Infraestructura | `core/` | Base de datos, sesiones, seguridad, validaciones, fechas, reportes PDF/Excel y Google Drive. |
 | Utilidades | `utils/` | Generación y lectura de códigos QR. |
 
 Flujo de una acción típica: la vista (`views/`) recibe la interacción, llama a un método del modelo (`models/`), que valida y persiste mediante `core/database.py`; la vista vuelve a dibujarse con el resultado.
@@ -23,44 +23,53 @@ Flujo de una acción típica: la vista (`views/`) recibe la interacción, llama 
 
 ```
 sia-python-edition/
-├── app.py                      Punto de entrada: página, sesión y ruteo por rol
+├── app.py                      Punto de entrada: arranque seguro de la base, sesión y ruteo por perfil
 ├── seed_init.py                Verifica e inicializa la base de datos
 ├── requirements.txt            Dependencias de Python
 ├── packages.txt                Paquetes del sistema para Streamlit Cloud
 ├── README.md                   Guía de uso y despliegue
 ├── .streamlit/
 │   ├── config.toml             Tema y configuración del servidor
-│   └── secrets.toml.example    Plantilla de Secrets (SIA_SECRET, Drive, etc.)
+│   └── secrets.toml.example    Plantilla de Secrets (SIA_SECRET, SIA_SUPERADMINS, Drive, etc.)
 ├── .devcontainer/              Entorno de desarrollo para GitHub Codespaces
 ├── assets/
-│   ├── logo_ies11.png          Logo del IES N° 11 (encabezado y barra lateral)
+│   ├── logo_ies11.png          Logo de la institución inicial (se copia a la base al crearla)
 │   ├── logo_tech.png           Logo de Tech & Innovation Team (pie de página)
 │   └── LEEME.md                Cómo reemplazar los logos
 ├── static/                     Servido en /app/static/ (PWA)
 │   ├── manifest.json           Manifiesto de la app instalable
 │   └── icon-*.png              Íconos (192, 512, adaptable y Apple)
 ├── core/
-│   ├── database.py             Esquema SQLite, conexiones y migraciones
+│   ├── database.py             Esquema SQLite v4, conexiones, migraciones y asegurar_esquema()
+│   ├── sesiones.py             Sesiones persistentes (token en cookie, hash en la base)
 │   ├── security.py             Hash de contraseñas, firmas HMAC, lectura de Secrets
 │   ├── validaciones.py         Opciones de los selectores y validaciones
 │   ├── tiempo.py               Fecha y hora en la zona horaria institucional
 │   ├── reportes.py             PDF de cierre de clase y planillas Excel
 │   └── drive.py                Subida de archivos a Google Drive
 ├── models/
-│   ├── persona.py              Persona (abstracta), Docente, Estudiante y RepositorioPersonas
+│   ├── persona.py              Persona (abstracta), Estudiante, Docente, Preceptor, Directivo, Administrador
+│   ├── institucion.py          Instituciones, carreras, roles por institución y opciones del sistema
+│   ├── justificativo.py        Justificativos: alta, aprobación en lote y justificación masiva
 │   ├── materia.py              Materia: cursada, inscripciones, clases y programa PDF
 │   ├── asistencia.py           RegistroAsistencia: tokens QR, PIN, marcado idempotente
 │   └── predictor_ia.py         PredictorRiesgoIA: Random Forest y análisis por reglas
 ├── utils/
 │   └── qr.py                   Genera y lee códigos QR (OpenCV / pyzbar)
 ├── views/
-│   ├── auth.py                 Acceso, registro, sesión con expiración, cambio de contraseña
+│   ├── auth.py                 Acceso por institución, registro, sesión persistente, cambio de perfil y contraseña
 │   ├── docente.py              Panel docente (Materias, Clase en vivo, Lector QR, Historial)
-│   ├── alumno.py               Panel estudiante (Presente, Unirme, Mi historial, Credencial)
+│   ├── alumno.py               Panel estudiante (Presente, Unirme, Mi historial, Justificativos, Credencial)
+│   ├── preceptor.py            Panel de Preceptoría
+│   ├── directivo.py            Panel de Rectoría / Dirección
+│   ├── superadmin.py           Administración general
+│   ├── config_institucion.py   Formularios de identidad visual y umbrales académicos
+│   ├── justificativos.py       Bandeja de aprobación y formulario del alumno
+│   ├── graficos.py             Gráficos Plotly con estilo único
 │   ├── escaner.py              Escáner QR en vivo (st.components.v2 + MediaDevices)
 │   ├── exportar.py             Botones de CSV, Excel y Google Drive
 │   ├── pwa.py                  PWA y ocultamiento de elementos de Streamlit Cloud
-│   └── styles.py               Paleta, tipografía, modo oscuro, componentes HTML responsivos
+│   └── styles.py               Tokens por institución, paleta base, tipografía, indicadores circulares
 ├── scripts/
 │   └── drive_autorizar.py      Autoriza Google Drive (se ejecuta una vez)
 └── docs/                       Informes del sistema (.md y .pdf) y su generador
@@ -71,9 +80,9 @@ sia-python-edition/
 ### 3.1 `app.py`
 
 1. Descarta módulos del proyecto desactualizados en memoria (evita errores de importación tras un redespliegue en Streamlit Cloud).
-2. Configura la página e inicializa la base (una vez por proceso).
+2. Configura la página y llama a `asegurar_esquema()` **en cada ejecución**, antes de cualquier consulta (ver 3.2.2).
 3. Captura enlaces QR abiertos con la cámara del celular (`?asistencia=` o `?inscribir=`), los valida en el momento y los guarda como acción pendiente.
-4. Inyecta estilos y la configuración PWA, valida la sesión y deriva al panel según el rol.
+4. Restaura la sesión desde la cookie, aplica la identidad de la institución, inyecta estilos y PWA y deriva al panel del perfil activo.
 
 ### 3.2 Modelo de datos (SQLite)
 
@@ -105,6 +114,18 @@ Las migraciones son automáticas: `init_db()` crea las tablas faltantes y agrega
 - `views/styles.py` genera los tokens de diseño desde los colores de la institución activa; `views/graficos.py`
   centraliza los gráficos (una serie con el color institucional, varias con paleta categórica fija, estados con texto).
 
+### 3.2.2 Arranque e inicialización de la base
+
+`core/database.py` expone `asegurar_esquema()`:
+
+1. `esquema_al_dia()` comprueba con una consulta liviana que el archivo exista, que estén las tablas clave (`instituciones`, `membresias`, `sesiones`, `config`), que `schema_version` sea la actual (4) y que haya al menos una institución.
+2. Si algo falta, toma un *lock* de proceso, vuelve a comprobar (otro hilo pudo haber migrado) y ejecuta `init_db()`: reconstruye las tablas con `CHECK` viejos, crea las tablas e índices que faltan, agrega columnas, crea la institución inicial y convierte los roles antiguos en membresías. Todo es idempotente.
+3. Si la base no se puede preparar, la app muestra un mensaje en pantalla y se detiene sin traceback.
+
+**Por qué no se usa `st.cache_resource`:** en Streamlit Cloud el proceso de Python sobrevive a las actualizaciones del repositorio. La versión anterior cacheaba `init_db()` en una función cuyo código no cambió, así que tras publicar la v4 el resultado cacheado de la v3 seguía vigente, la migración nunca corría y la primera consulta fallaba con `sqlite3.OperationalError: no such table: instituciones`. La comprobación por ejecución cuesta una consulta y elimina ese riesgo.
+
+Escenarios verificados: base inexistente (contenedor nuevo), base v3 con usuarios (se migra y conserva datos y roles), 12 hilos arrancando a la vez y arranque completo de la app sobre una base v3 sin migrar.
+
 ### 3.3 Asistencia por QR
 
 | Código | Formato | Quién lo escanea |
@@ -130,9 +151,19 @@ Componente `st.components.v2` (HTML, CSS y JavaScript que corren en la página):
 - `core/reportes.py`: PDF con fpdf2 y fuentes base (funciona igual en Windows y Linux); Excel con openpyxl.
 - `core/drive.py`: subida multipart a Drive API v3 con google-auth, permiso `drive.file` y soporte de Unidades compartidas.
 
-### 3.6 Interfaz responsiva
+### 3.6 Sistema visual e interfaz responsiva
 
-`views/styles.py` define los componentes HTML propios: tarjetas, indicadores, `tabla_html` (se vuelve tarjetas en pantallas angostas), `grilla_historial` (íconos que pasan de línea) y `banner_riesgo`. Las pestañas se acomodan en varias filas. Resultado: ninguna vista tiene scroll horizontal.
+`views/styles.py` concentra el sistema visual:
+
+- **Tokens de diseño** (`_variables()`): se generan en cada ejecución a partir de la institución activa. Fondo `#EEF0EC`, superficies blancas, texto marino `#142033`, acento = color principal de la institución; en modo oscuro, fondo `#0D1522` y superficies `#142033`.
+- **Paleta base y presets** (`PALETAS`): «Acero y marino», «Verde azulado», «Oliva» y «Marino profundo», disponibles al crear o editar una institución.
+- **Contraste automático:** `tinta_sobre()` elige texto blanco o marino; `fondo_marca()` oscurece el color hacia el marino hasta 7:1 para el panel de acceso; `_aclarar_para_oscuro()` lleva el acento a 4,5:1 en modo oscuro.
+- **Tipografía:** Plus Jakarta Sans por Google Fonts con `display=swap`; si no carga, Inter y la fuente del sistema.
+- **Indicadores circulares:** `kpi_grid()` recibe `(etiqueta, valor, contexto, tono[, pct])` y dibuja un anillo SVG (`anillo_html`) cuyo arco usa `pathLength=100`; si el valor es «NN %» el porcentaje se deduce solo. `tarjeta_progreso()` usa el mismo anillo para cada materia del alumno.
+- **Componentes:** `tabla_html` (tarjetas en pantallas angostas), `grilla_historial`, `banner_riesgo`, `panel_login` y `titulo_login`.
+- **Gráficos** (`views/graficos.py` + `estilo_plotly`): misma tipografía, grilla fina, una sola escala, etiquetas largas partidas en renglones (`partir`), leyenda debajo del gráfico con margen propio, una serie con el color institucional y varias con una paleta categórica validada en orden fijo.
+
+Resultado: ninguna vista tiene scroll horizontal (verificado en 375 y 1024 px).
 
 ## 4. Configuración (Secrets)
 
@@ -155,14 +186,26 @@ Componente `st.components.v2` (HTML, CSS y JavaScript que corren en la página):
 
 Mientras Drive no esté configurado, los botones "Enviar a Google Drive" aparecen deshabilitados con una explicación.
 
-## 5. Despliegue
+## 5. Despliegue y persistencia de datos
 
-1. Subir el repositorio a GitHub y crear la app en Streamlit Community Cloud apuntando a `app.py`.
-2. Cargar los Secrets (al menos `SIA_SECRET`).
+### 5.1 Streamlit Community Cloud (estado actual)
+
+1. Subir el repositorio a GitHub y crear la app apuntando a `app.py`.
+2. Cargar los Secrets (al menos `SIA_SECRET` y `SIA_SUPERADMINS`).
 3. `packages.txt` instala `libzbar0`; `requirements.txt`, las dependencias de Python.
-4. Tras cada actualización, si algo se ve desactualizado: Manage app, menú, Reboot app.
+4. Cada actualización del repositorio se aplica sola; la base se migra en la primera ejecución gracias a `asegurar_esquema()`.
 
-**Persistencia:** el disco de Streamlit Cloud es efímero. Para uso institucional prolongado, conviene un servidor con disco persistente (`SIA_DB_PATH`) o copias periódicas de `database.db`.
+**Limitación:** el disco del contenedor es efímero. `database.db` sobrevive a recargas y sesiones, pero **se pierde al reiniciar, redesplegar o cuando la app entra en reposo** por inactividad. Al volver, la app arranca con una base nueva (con la institución inicial) sin errores, pero sin los datos anteriores. Sirve para demostraciones y pilotos, no para el servicio comercial.
+
+### 5.2 Opciones para producción (modelo SaaS)
+
+| Opción | Cómo se implementa | Cuándo conviene |
+|---|---|---|
+| **A. Contenedor con volumen durable** (recomendada a corto plazo) | Ejecutar la app con Docker en un proveedor con discos persistentes (por ejemplo Render, Railway, Fly.io o una VM) montando un volumen en `/data` y definiendo `SIA_DB_PATH=/data/database.db`. No requiere cambios de código. SQLite en modo WAL soporta bien varias sesiones simultáneas en **una** instancia. | Decenas de instituciones y cientos de usuarios concurrentes con una sola instancia. |
+| **B. Copias continuas** (complemento de A) | Replicar la base a un almacenamiento de objetos (S3, R2 o GCS) con Litestream, o programar `sqlite3 database.db ".backup …"` diario con retención. Restaurar = descargar el archivo y apuntar `SIA_DB_PATH`. | Siempre que se use SQLite en producción. |
+| **C. Base externa gestionada** (mediano plazo) | PostgreSQL gestionado (Neon, Supabase, Amazon RDS, Cloud SQL). Requiere adaptar `core/database.py` (conexión por URL en Secrets, por ejemplo con SQLAlchemy y psycopg) y portar las migraciones; el resto del código usa SQL estándar y la capa `get_connection()`. **Todavía no está implementado.** | Varias instancias de la app en paralelo, alta disponibilidad o requisitos de auditoría y respaldo gestionados. |
+
+Recomendación: pasar a la opción **A + B** antes de incorporar instituciones con datos reales y planificar **C** cuando el volumen lo justifique. No conviene seguir en Streamlit Community Cloud para el servicio comercial.
 
 ## 6. Verificación
 
@@ -170,8 +213,9 @@ Mientras Drive no esté configurado, los botones "Enviar a Google Drive" aparece
 |---|---|
 | Sintaxis de todos los módulos | `python -m compileall` |
 | Estilo y errores comunes | `ruff check --select E,F,W,B` |
-| Arranque de todas las vistas (3 roles, modo claro y oscuro) | `streamlit.testing.v1.AppTest` |
-| Escáner, cierre de clase y scroll horizontal | Navegador con cámara simulada y medición del DOM en 320, 375 y 1280 px |
+| Arranque de la base (vacía, v3 heredada, 12 hilos, app sobre v3 sin migrar) | Script con bases temporales y `AppTest` |
+| Todas las vistas: login y 5 perfiles en 2 instituciones, modo claro y oscuro (17 casos) | `streamlit.testing.v1.AppTest` |
+| Login, persistencia al recargar, marca blanca, indicadores circulares y scroll horizontal | Navegador real en 375 y 1024 px, claro y oscuro |
 
 ## 7. Generación de estos documentos
 

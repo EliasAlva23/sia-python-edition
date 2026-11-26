@@ -52,7 +52,11 @@ docs/               informes del sistema (.md y .pdf)
 
 ## Identidad visual
 
-- Diseño sobrio y corporativo: tipografía Inter, superficies planas, bordes finos, sin gradientes.
+- Paleta base: azul marino profundo `#142033`, azul acero `#2E5772`, verde azulado `#3F7C70`, verde oliva `#70812B`
+  y fondo claro suave `#EEF0EC`, ofrecida como paletas sugeridas al configurar cada institución.
+- Diseño sobrio: superficies planas, bordes finos, sin degradés; claro por defecto.
+- **Indicadores en tarjetas circulares** (anillo proporcional al dato) en todos los paneles.
+- Tipografía Plus Jakarta Sans, con Inter y la fuente del sistema como respaldo.
 - El color principal y el logo vienen de la institución activa (los configura Dirección o la Administración
   general, con control de contraste). En modo oscuro el acento se aclara automáticamente hasta 4.5:1.
 - Gráficos: una serie usa el color institucional; varias series, una paleta categórica fija; los estados
@@ -147,7 +151,10 @@ streamlit run app.py
    (`SIA_SECRET` es importante: sin ella los QR se firman con una clave guardada en la propia DB).
 3. `packages.txt` instala `libzbar0` para `pyzbar`; OpenCV funciona sin dependencias de sistema.
 
+La base se crea o migra sola en cada arranque (`asegurar_esquema()`), incluso con un contenedor nuevo.
+
 ⚠️ **Persistencia en Community Cloud:** el disco del contenedor es efímero. `database.db` sobrevive entre
 sesiones y recargas, pero **se pierde cuando la app se reinicia, se redespliega o entra en reposo**.
 Para uso institucional real, montá la app en un servidor con disco persistente (o apuntá
-`SIA_DB_PATH` a un volumen) y hacé copias periódicas de `database.db`.
+`SIA_DB_PATH` a un volumen) y hacé copias periódicas de `database.db`. Las opciones para el modelo SaaS
+(volumen durable, copias continuas, PostgreSQL) están en [Arquitectura, sección 5](docs/ARQUITECTURA.md).

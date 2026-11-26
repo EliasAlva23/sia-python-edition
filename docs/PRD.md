@@ -1,14 +1,14 @@
 # PRD — Documento de Requisitos del Producto
 
-**SIA · Sistema de Asistencia Inteligente — IES N° 11**  
-Instituto de Educación Superior N° 11 · Tech & Innovation Team  
-Versión: noviembre de 2026 · Estado: en producción (Streamlit Community Cloud)  
+**SIA · Sistema de Asistencia Inteligente — plataforma multi-institución**  
+Tech & Innovation Team · Institución inicial: IES N° 11  
+Versión: noviembre de 2026 · Estado: piloto en Streamlit Community Cloud  
 
 ---
 
 ## 1. Resumen
 
-SIA registra la asistencia de las clases del IES N° 11 con códigos QR firmados, muestra a docentes y estudiantes su historial de asistencia y alerta de forma temprana cuando un alumno puede perder la regularidad, combinando reglas de asistencia con un modelo de aprendizaje automático.
+SIA es una plataforma (SaaS) que varias instituciones de nivel superior usan con su propia identidad. Registra la asistencia de las clases con códigos QR firmados, muestra a docentes y estudiantes su historial de asistencia y alerta de forma temprana cuando un alumno puede perder la regularidad, combinando reglas de asistencia con un modelo de aprendizaje automático.
 
 ## 2. Problema
 
@@ -32,7 +32,9 @@ SIA registra la asistencia de las clases del IES N° 11 con códigos QR firmados
 |---|---|
 | Docente | Crear materias, abrir y cerrar clases, registrar asistencia rápido, ver quién está en riesgo, exportar reportes. |
 | Estudiante | Dar presente en segundos, unirse a materias, conocer su situación y su historial, descargar el programa. |
-| Preceptoría (destinataria) | Recibir el reporte PDF de cada clase y planillas consolidadas (Excel o Google Drive). |
+| Preceptoría | Registrar asistencia de alumnos sin dispositivo, vincular alumnos, revisar justificativos, recibir el PDF de cada clase. |
+| Rectoría / Dirección | Ver la situación institucional por carrera y materia, definir umbrales y la identidad visual, gestionar carreras y personal. |
+| Administración general | Dar de alta instituciones, administrar roles y habilitar funciones. |
 
 ## 5. Requisitos funcionales
 
@@ -111,13 +113,15 @@ SIA registra la asistencia de las clases del IES N° 11 con códigos QR firmados
 | ID | Requisito |
 |---|---|
 | RNF-01 | Diseño responsivo sin scroll horizontal en ninguna vista (verificado en 320, 375 y 1280 px). |
-| RNF-02 | Modo claro y oscuro con contraste legible. |
+| RNF-02 | Claro por defecto y modo oscuro; contraste mínimo 4,5:1 en texto (7:1 en el panel de acceso), calculado sobre el color de cada institución. |
+| RNF-09 | Identidad visual sobria basada en la paleta `#142033`, `#2E5772`, `#3F7C70`, `#70812B` y `#EEF0EC`, con indicadores en tarjetas circulares y tipografía Plus Jakarta Sans (respaldo: Inter y fuente del sistema). |
+| RNF-10 | Arranque seguro: antes de cualquier consulta se verifica el esquema de la base y, si falta o es anterior, se crea o migra de forma idempotente (también con la base vacía de un contenedor nuevo y con varias sesiones arrancando a la vez). |
 | RNF-03 | Contraseñas con PBKDF2-HMAC-SHA256, 200 000 iteraciones y sal por usuario; comparación en tiempo constante. |
 | RNF-04 | QR y credenciales firmados con HMAC-SHA256 (`SIA_SECRET`). |
 | RNF-05 | Instalable como PWA (manifiesto, íconos y metaetiquetas para Android e iOS). |
 | RNF-06 | Funciona en Streamlit Community Cloud; sin servidores adicionales. |
 | RNF-07 | Google Drive con permiso mínimo `drive.file` (la app solo accede a los archivos que crea). |
-| RNF-08 | Textos en español rioplatense y nombre institucional unificado ("IES N° 11"). |
+| RNF-08 | Textos en español rioplatense; el nombre de cada institución sale de su configuración. |
 
 ## 8. Pila tecnológica
 
@@ -135,7 +139,8 @@ SIA registra la asistencia de las clases del IES N° 11 con códigos QR firmados
 
 | Tema | Detalle y mitigación |
 |---|---|
-| Persistencia en Streamlit Cloud | El disco del contenedor es efímero: `database.db` se pierde en reinicios o redespliegues. Mitigación: copias periódicas o servidor con disco persistente (`SIA_DB_PATH`). |
+| Persistencia en Streamlit Cloud | El disco del contenedor es efímero: `database.db` se pierde en reinicios, redespliegues o cuando la app entra en reposo. Sirve para demostraciones y pilotos; para el servicio comercial se requiere un volumen durable o una base externa (ver Arquitectura, sección 5). |
+| Una sola base SQLite | Funciona bien con una instancia de la app. Para varias instancias en paralelo hace falta migrar a PostgreSQL. |
 | Google Drive | Requiere credenciales que configura la institución. Con cuenta de servicio, la carpeta debe estar en una Unidad compartida (las cuentas de servicio no tienen espacio propio). |
 | Elementos de Streamlit Cloud | El ocultamiento de "Manage app" y de la insignia depende de la estructura actual de Cloud; si Streamlit la cambia, hay que actualizar los selectores. |
 | Escáner | Requiere https y permiso de cámara; si el navegador lo bloquea, quedan la foto, el PIN y el ingreso manual. |
@@ -145,4 +150,4 @@ SIA registra la asistencia de las clases del IES N° 11 con códigos QR firmados
 
 - Integración con el sistema de gestión académica del Ministerio.
 - Notificaciones por email o WhatsApp.
-- Múltiples instituciones en una misma instalación.
+- Base de datos PostgreSQL gestionada y escalado horizontal (varias instancias de la app).

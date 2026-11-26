@@ -26,7 +26,8 @@ DOCUMENTOS = [
     ("ARQUITECTURA.md", "Arquitectura del Sistema"),
 ]
 LOGO = RAIZ / "static" / "icon-192.png"
-AZUL_NOCHE, AZUL, LILA = (0, 52, 103), (52, 111, 176), (183, 143, 182)
+# Paleta base de SIA: marino #142033, acero #2E5772, verde azulado #3F7C70
+AZUL_NOCHE, AZUL, LILA = (20, 32, 51), (46, 87, 114), (63, 124, 112)
 FUENTES = [
     {"regular": "C:/Windows/Fonts/arial.ttf", "B": "C:/Windows/Fonts/arialbd.ttf", "I": "C:/Windows/Fonts/ariali.ttf",
      "BI": "C:/Windows/Fonts/arialbi.ttf", "mono": "C:/Windows/Fonts/cour.ttf"},
@@ -56,7 +57,7 @@ class Documento(FPDF):
         self.set_auto_page_break(auto=True, margin=18)
         self.set_margins(16, 16, 16)
         self.set_title(titulo)
-        self.set_author("Tech & Innovation Team - IES N° 11")
+        self.set_author("Tech & Innovation Team")
 
     def header(self) -> None:
         self.set_fill_color(*AZUL_NOCHE)
@@ -68,18 +69,18 @@ class Documento(FPDF):
         self.set_xy(31, 5)
         self.set_text_color(255, 255, 255)
         self.set_font(self.fuente, "B", 12)
-        self.cell(0, 6, "SIA · IES N° 11", new_x="LMARGIN", new_y="NEXT")
+        self.cell(0, 6, "SIA · Sistema de Asistencia Inteligente", new_x="LMARGIN", new_y="NEXT")
         self.set_x(31)
         self.set_font(self.fuente, "", 9)
         self.cell(0, 5, self.titulo)
-        self.set_text_color(14, 39, 71)
+        self.set_text_color(20, 32, 51)
         self.set_y(30)
 
     def footer(self) -> None:
         self.set_y(-12)
         self.set_font(self.fuente, "", 8)
         self.set_text_color(110, 120, 140)
-        self.cell(0, 6, "Instituto de Educación Superior N° 11 · Tech & Innovation Team", align="L")
+        self.cell(0, 6, "SIA · Tech & Innovation Team · Institución inicial: IES N° 11", align="L")
         self.cell(0, 6, f"Página {self.page_no()}/{{nb}}", align="R")
 
 
@@ -114,7 +115,7 @@ def _tabla(pdf: Documento, html_tabla: str) -> None:
     pdf.ln(1)
     pdf.set_font(pdf.fuente, size=9)
     with pdf.table(col_widths=anchos, headings_style=encabezado, line_height=5.2, text_align="LEFT",
-                   cell_fill_color=(238, 240, 250), cell_fill_mode="ROWS", padding=1.6) as tabla:
+                   cell_fill_color=(238, 240, 236), cell_fill_mode="ROWS", padding=1.6) as tabla:
         for fila in filas:
             renglon = tabla.row()
             for celda in fila + [""] * (columnas - len(fila)):
@@ -131,7 +132,7 @@ def generar(md: Path, titulo: str) -> Path:
         "h1": TextStyle(font_family=pdf.fuente, font_style="B", font_size_pt=18, color=AZUL_NOCHE, t_margin=2, b_margin=4),
         "h2": TextStyle(font_family=pdf.fuente, font_style="B", font_size_pt=14, color=AZUL, t_margin=6, b_margin=2),
         "h3": TextStyle(font_family=pdf.fuente, font_style="B", font_size_pt=12, color=AZUL_NOCHE, t_margin=4, b_margin=1),
-        "pre": TextStyle(font_family=pdf.mono, font_size_pt=7.5, color=(14, 39, 71)),
+        "pre": TextStyle(font_family=pdf.mono, font_size_pt=7.5, color=(20, 32, 51)),
         "code": TextStyle(font_family=pdf.mono, font_size_pt=8.5),
     }
     for parte in re.split(r"(<table>.*?</table>)", html, flags=re.S):

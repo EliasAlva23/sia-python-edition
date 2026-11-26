@@ -1,8 +1,8 @@
-# Informe de Interfaces — SIA · IES N° 11
+# Informe de Interfaces — SIA
 
-**Sistema de Asistencia Inteligente (Python Edition)**  
-Instituto de Educación Superior N° 11 · Desarrollado por Tech & Innovation Team  
-Versión del documento: noviembre de 2026  
+**Sistema de Asistencia Inteligente — plataforma multi-institución**  
+Tech & Innovation Team · Institución inicial: Instituto de Educación Superior N° 11  
+Versión del documento: noviembre de 2026 (esquema de datos v4)  
 
 ---
 
@@ -10,33 +10,43 @@ Versión del documento: noviembre de 2026
 
 | Principio | Cómo se aplica |
 |---|---|
-| Identidad institucional | Paleta del IES N° 11: lila `#B78FB6` (acentos), lavanda `#7979B1` (secundarios), azul `#346FB0` (botones y bordes), azul oscuro `#02447B` (tarjetas en modo oscuro) y azul noche `#003467` (fondo en modo oscuro). Tipografía Plus Jakarta Sans. |
-| Modo claro y oscuro | Interruptor "Modo oscuro" en la barra lateral. Tablas, gráficos, cámara y alertas se adaptan a cada modo. |
-| Cero scroll horizontal | Ninguna vista se desplaza de costado: las tablas se transforman en tarjetas en pantallas angostas, el historial usa íconos que pasan de línea y las pestañas se acomodan en varias filas. Verificado en 1280, 375 y 320 px. |
-| Lenguaje cotidiano | "Mi historial" en lugar de "sábana"; "Análisis por reglas de asistencia" en lugar de "modo heurístico"; mensajes de error que explican qué hacer. |
-| Accesible desde el celular | Instalable como app (PWA), escáner con cámara trasera, PIN de 6 dígitos como alternativa a la cámara. |
+| Identidad institucional (marca blanca) | Cada institución tiene nombre, logo, color principal y color secundario propios, y se aplican al login, encabezados, botones, anillos de los indicadores, gráficos de una serie y reportes PDF. Se llega por el enlace `…/?i=identificador`. |
+| Paleta base de SIA | Azul marino profundo `#142033` (texto y panel de acceso), azul acero `#2E5772` (acento por defecto), verde azulado `#3F7C70`, verde oliva `#70812B` y fondo claro suave `#EEF0EC`. Se ofrecen como paletas sugeridas: «Acero y marino», «Verde azulado», «Oliva» y «Marino profundo». |
+| Sobriedad | Superficies planas, bordes finos de 1 px, esquinas de 14 px, sin degradés ni sombras marcadas. Un solo color de acento por pantalla. |
+| Tipografía | Plus Jakarta Sans (400 a 700) desde Google Fonts, con Inter y la fuente del sistema como respaldo si no carga. Títulos en 700, texto con interlineado 1,6 para lectura cómoda. |
+| Indicadores circulares | Cada indicador es una tarjeta con un anillo: el arco cubre el porcentaje (o la proporción sobre el total) y el valor va en el centro, con la etiqueta y el contexto debajo. Rojo, ámbar y verde se reservan para estados y siempre van acompañados de texto. |
+| Contraste | El texto sobre el color institucional se elige automáticamente (blanco o marino). El panel de acceso lleva el color hacia el marino hasta lograr 7:1 con texto blanco. En modo oscuro el acento se aclara hasta 4,5:1. La configuración de identidad muestra el contraste antes de guardar. |
+| Modo claro y oscuro | Claro por defecto; interruptor «Modo oscuro» en la barra lateral. El oscuro usa la misma paleta (fondo `#0D1522`, superficies `#142033`). |
+| Cero scroll horizontal | Las tablas pasan a tarjetas en pantallas angostas, los indicadores se ordenan de a dos, las etiquetas largas de los gráficos se parten en renglones y las pestañas se acomodan en varias filas. Verificado en 375 y 1024 px. |
+| Lenguaje cotidiano | «Mi historial», «Análisis por reglas de asistencia», mensajes de error que explican qué hacer. |
 
 ## 2. Elementos comunes a todas las vistas
 
-- **Encabezado (banner):** logo circular del IES N° 11, saludo y descripción del panel.
-- **Barra lateral:** marca "SIA · IES N° 11", interruptor de modo oscuro, tarjeta del usuario (nombre, DNI y rol), cambiar contraseña, cerrar sesión y aviso de expiración de la sesión (30 minutos sin actividad). En el docente incluye además el selector de **materia activa**. En celulares se abre con el botón ">>" de la esquina superior izquierda.
-- **Pie de página:** logo y leyenda "Desarrollado por Tech & Innovation Team — IES N° 11".
-- **Elementos ocultos:** menú nativo de Streamlit, botones de GitHub, Share y Deploy, insignia "Hosted with Streamlit" y botón "Manage app" de Streamlit Cloud.
+- **Encabezado:** logo circular de la institución, nombre de la institución en versalitas, título del panel y bajada, con una línea corta del color institucional debajo.
+- **Barra lateral:** marca de la institución, nombre, rol y DNI de la persona, **selector de perfil** (si tiene varios roles o instituciones), interruptor de modo oscuro, cambiar contraseña, cerrar sesión y aviso de expiración (30 minutos sin actividad; recargar la página no cierra la sesión). En celulares se abre con el botón «>>»; el contenido deja espacio arriba para que el botón no tape el encabezado.
+- **Indicadores:** grilla de tarjetas circulares (de a dos en celulares).
+- **Gráficos:** Plotly con la tipografía de la app, grilla fina, una sola escala, leyenda debajo del gráfico cuando hay varias series y umbrales como línea rotulada.
+- **Aviso global:** si la Administración general publica un aviso, aparece arriba de cada panel.
+- **Pie de página:** logo y leyenda «SIA · Desarrollado por Tech & Innovation Team».
+- **Elementos ocultos:** menú nativo de Streamlit, botones de GitHub, Share y Deploy, insignia «Hosted with Streamlit» y botón «Manage app».
 
 ## 3. Pantalla de acceso
 
 | Elemento | Detalle |
 |---|---|
-| Pestaña Ingresar | DNI o email y contraseña. Validación de campos vacíos y bloqueo temporal tras 5 intentos fallidos. |
-| Pestaña Crear cuenta | Tipo de cuenta (Estudiante / Docente). Orden de campos: Nombre, Apellido, DNI, Email, Legajo o Departamento, Contraseña, Repetir contraseña. Todos los errores se muestran juntos. Si está configurado `SIA_DOCENTE_CODE`, el alta docente pide el código institucional. |
-| Aviso de QR pendiente | Si la persona llegó escaneando un QR con la cámara del celular, una tarjeta le indica que ingrese o cree su cuenta; al terminar, la inscripción o el presente se registran solos. |
+| Panel institucional (izquierda) | Fondo marino teñido con el color de la institución, logo circular, «SIA · Sistema de Asistencia Inteligente», nombre de la institución, tres beneficios con viñetas circulares y círculos decorativos de línea fina. En celulares queda arriba del formulario. |
+| Institución | Si se entró por `?i=identificador` o el navegador la recuerda (cookie `sia_inst`), ya viene elegida; si hay varias instituciones activas aparece un selector. Toda la pantalla se recolorea con su identidad. |
+| Bienvenida | Título «Te damos la bienvenida» y una línea de ayuda. |
+| Pestaña Ingresar | DNI o email y contraseña. Bloqueo temporal tras 5 intentos fallidos. Si la persona tiene varios perfiles, elige con cuál entrar. |
+| Pestaña Crear cuenta | Estudiante o Docente (según lo habilitado por la Administración general). Orden: Nombre, Apellido, DNI, Email, Legajo o Departamento, Contraseña, Repetir contraseña. El alta docente pide el código de la institución si está definido. |
+| Aviso de QR pendiente | Si la persona llegó escaneando un QR, una tarjeta le indica que ingrese o cree su cuenta; al terminar, la inscripción o el presente se registran solos. |
 
 ## 4. Panel del Estudiante
 
 Arriba de las pestañas:
 
 - **Alerta de riesgo:** banner rojo automático cuando el porcentaje de una materia queda bajo el umbral (indica cuántas clases seguidas necesita para recuperar la regularidad); banner ámbar cuando acumula faltas seguidas.
-- **Indicadores:** asistencia general, presentes, ausencias (con racha actual) y cantidad de materias.
+- **Indicadores circulares:** asistencia general (anillo con el porcentaje, en rojo, ámbar o verde según el umbral), presentes y ausencias (anillo con la proporción sobre el total de clases; ausencias con la racha actual) y cantidad de materias.
 
 ### 4.1 Pestaña "Dar presente"
 
