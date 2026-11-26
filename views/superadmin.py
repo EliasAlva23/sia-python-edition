@@ -1,4 +1,5 @@
-"""Administración general del SaaS: instituciones, usuarios y roles, parámetros del sistema."""
+"""Administración general del SaaS: instituciones (identidad, enlace ?i=, activación), altas de Preceptoría,
+Dirección y demás roles institucionales, acceso de cualquier cuenta y parámetros del sistema."""
 from __future__ import annotations
 
 import pandas as pd
@@ -6,6 +7,7 @@ import streamlit as st
 
 from core.database import SCHEMA_VERSION, get_connection
 from core.validaciones import TOLERANCIAS_TARDE
+from models import cuentas
 from models.institucion import (
     NOMBRES_ROL,
     OPCIONES,
@@ -18,12 +20,15 @@ from models.institucion import (
     quitar_rol,
 )
 from models.persona import Persona, RepositorioPersonas
+from utils.qr import url_app
+from views import personal
 from views.config_institucion import form_identidad, form_umbrales
 from views.styles import (
     ESTADO,
     PALETAS,
     encabezado,
     estado_html,
+    guia_panel,
     kpi_grid,
     mostrar_errores,
     tabla_html,
@@ -34,12 +39,27 @@ ROLES_ASIGNABLES = ("estudiante", "docente", "preceptor", "directivo")
 
 
 def render(admin: Persona) -> None:
-    encabezado("Administración general", "Instituciones, usuarios y parámetros del sistema")
+    encabezado("Administración general", "Gestionás las instituciones, sus responsables y el sistema completo")
+    todas = Institucion.todas(solo_activas=False)
+    activas = sum(1 for i in todas if i.activa)
+    with get_connection() as conn:
+        usuarios = conn.execute("SELECT COUNT(*) FROM usuarios WHERE activo = 1").fetchone()[0]
+        preceptoria = conn.execute("SELECT COUNT(*) FROM membresias WHERE rol = 'preceptor'").fetchone()[0]
+    kpi_grid([
+        ("Instituciones activas", activas, f"de {len(todas)} en total", "neutro", 100 * activas / len(todas) if todas else 0),
+        ("Personas con cuenta", usuarios, "en todas las instituciones", "neutro"),
+        ("Preceptoría", preceptoria, "personas asignadas", "neutro" if preceptoria else "ambar"),
+    ])
+    guia_panel([
+        ("Instituciones", "Alta, nombre, logo, colores, enlace ?i= y activar o suspender."),
+        ("Usuarios y roles", "Dar de alta Preceptoría o Dirección, asignar roles y restablecer accesos."),
+        ("Sistema", "Funciones habilitadas, aviso general y estado de la base."),
+    ])
     tabs = st.tabs(["Instituciones", "Usuarios y roles", "Sistema"])
     with tabs[0]:
         _instituciones()
     with tabs[1]:
-        _usuarios()
+        _usuarios(admin)
     with tabs[2]:
         _sistema()
 
@@ -61,7 +81,7 @@ def _instituciones() -> None:
     todas = Institucion.todas(solo_activas=False)
     stats = _estadisticas()
     tabla_html(
-        [{"nombre": i.nombre, "corto": i.nombre_corto, "enlace": f"?i={i.slug}",
+        [{"nombre": i.nombre, "corto": i.nombre_corto, "enlace": f"{url_app()}/?i={i.slug}",
           "estado": estado_html("Activa" if i.activa else "Suspendida", ESTADO["bueno"] if i.activa else ESTADO["critico"]),
           "estudiantes": int(stats.loc[i.id, "estudiantes"]) if i.id in stats.index else 0,
           "personal": int(stats.loc[i.id, "personal"]) if i.id in stats.index else 0,
@@ -107,7 +127,8 @@ def _alta_institucion() -> None:
         c1, c2, c3 = st.columns([2, 1, 1])
         nombre = c1.text_input("Nombre completo *", placeholder="Instituto Superior N° 5", max_chars=150)
         corto = c2.text_input("Nombre corto *", placeholder="IS N° 5", max_chars=40)
-        slug = c3.text_input("Identificador del enlace *", placeholder="is5", max_chars=31)
+        slug = c3.text_input("Identificador del enlace *", placeholder="is5", max_chars=31,
+                             help="Queda como …/?i=is5: quien entra por ese enlace ve el logo y los colores.")
         p1, p2, p3 = st.columns(3)
         paleta = st.radio("Paleta", [*PALETAS, PERSONALIZADA], horizontal=True,
                           help="Combinaciones de la paleta institucional de SIA, o colores propios con «Personalizada».")
@@ -118,9 +139,8 @@ def _alta_institucion() -> None:
         u1, u2 = st.columns(2)
         regular = u1.slider("Regularizar con (%)", 50, 100, 75, step=5)
         promocion = u2.slider("Promocionar con (%)", 50, 100, 80, step=5)
-        d1, d2 = st.columns(2)
-        codigo = d1.text_input("Código de alta docente (opcional)", type="password", max_chars=60)
-        director = d2.text_input("DNI de la persona a cargo de Dirección (opcional, debe tener cuenta)", max_chars=10)
+        director = st.text_input("DNI de la persona a cargo de Dirección (opcional, debe tener cuenta)", max_chars=10,
+                                 help="Si todavía no tiene cuenta, dala de alta después desde «Usuarios y roles».")
         logo = st.file_uploader("Logo (opcional)", type=["png", "jpg", "jpeg", "webp"], key="sa_alta_logo")
         crear = st.form_submit_button("Crear institución", type="primary")
     if not crear:
@@ -130,7 +150,7 @@ def _alta_institucion() -> None:
     try:
         inst = Institucion.crear(nombre=nombre, nombre_corto=corto, slug=slug.strip().lower(), color_primario=primario,
                                  color_secundario=secundario, umbral_regular=regular, umbral_promocion=promocion,
-                                 tolerancia_tarde=tolerancia, codigo_docente=codigo)
+                                 tolerancia_tarde=tolerancia)
         if logo is not None:
             inst.guardar_logo(logo.getvalue(), logo.type)
     except ValueError as exc:
@@ -144,11 +164,19 @@ def _alta_institucion() -> None:
             aviso = f" {persona.nombre_completo} quedó a cargo de Dirección."
         else:
             aviso = " No se encontró una cuenta con ese DNI: asigná Dirección desde «Usuarios y roles»."
-    st.success(f"Institución creada. Enlace de acceso: ?i={inst.slug}.{aviso}")
+    st.success(f"Institución creada. Enlace de acceso: {url_app()}/?i={inst.slug}.{aviso}")
 
 
 # ---------------------------------------------------------------- usuarios
-def _usuarios() -> None:
+def _usuarios(admin: Persona) -> None:
+    activas = Institucion.todas()
+    personal.tarjeta_credencial("sa_alta")
+    if activas:
+        with st.expander("Dar de alta Preceptoría, Dirección o docentes", icon=":material/person_add:"):
+            por_id = {i.id: i for i in activas}
+            elegida = st.selectbox("Institución", list(por_id), format_func=lambda i: por_id[i].nombre, key="sa_alta_inst")
+            personal.form_alta(por_id[elegida], ("preceptor", "directivo", "docente"), "sa_alta", admin.id,
+                               titulo=f"Alta en {por_id[elegida].nombre_corto}")
     st.markdown("#### Buscar una persona")
     dni = st.text_input("DNI", max_chars=10, key="sa_dni", placeholder="Ingresá el DNI y presioná Enter")
     if not dni.strip():
@@ -157,8 +185,7 @@ def _usuarios() -> None:
         return
     persona = RepositorioPersonas.por_dni(dni)
     if persona is None:
-        st.warning("No hay una cuenta con ese DNI. La persona puede registrarse o la Dirección de su institución "
-                   "puede crearla desde «Personal».")
+        st.warning("No hay una cuenta con ese DNI. Dala de alta con «Dar de alta Preceptoría, Dirección o docentes».")
         return
     with get_connection() as conn:
         filas = conn.execute(
@@ -195,6 +222,14 @@ def _usuarios() -> None:
         if sesiones and st.button("Cerrar todas sus sesiones", key=f"sa_cerrar_{persona.id}"):
             with get_connection() as conn:
                 conn.execute("DELETE FROM sesiones WHERE usuario_id = ?", (persona.id,))
+            st.rerun()
+        if persona.id != admin.id and st.button("Restablecer acceso (clave temporal)", key=f"sa_reset_{persona.id}",
+                                                icon=":material/key:",
+                     help="Genera una clave temporal de cambio obligatorio y cierra sus sesiones."):
+            inst_id, rol = (filas[0]["institucion_id"], filas[0]["rol"]) if filas else (None, None)
+            temporal, token = cuentas.restablecer_clave(persona.id, inst_id, rol, admin.id)
+            personal.guardar_credencial("sa_alta", persona, rol or "superadmin", temporal, token,
+                                        Institucion.obtener(inst_id), motivo="restablecer")
             st.rerun()
 
 

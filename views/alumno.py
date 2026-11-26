@@ -26,6 +26,7 @@ from views.styles import (
     chips,
     encabezado,
     grilla_historial,
+    guia_panel,
     kpi_grid,
     leyenda_historial,
     tabla_html,
@@ -47,13 +48,19 @@ def _institucion_id() -> int:
 
 
 def render(estudiante: Estudiante) -> None:
-    encabezado(f"Hola, {estudiante.nombre}", "Tu asistencia, tus materias y tu credencial")
+    encabezado(f"Hola, {estudiante.nombre}", "Panel de estudiante: tu asistencia, tus materias y tu credencial")
     _procesar_accion_pendiente(estudiante)
     _mostrar_resultado_guardado()
     materias = Materia.de_estudiante(estudiante.id, _institucion_id())
     df = Materia.registros_df([m.id for m in materias], estudiante_id=estudiante.id)
     _banner_riesgo(materias, df)
     _resumen(materias, df)
+    guia_panel([
+        ("Dar presente", "Escaneá el QR que proyecta tu docente o escribí el PIN."),
+        ("Unirme a una materia", "Con el código o el QR de inscripción de la materia."),
+        ("Mi historial", "Tus presentes y ausentes, materia por materia."),
+        ("Mi credencial", "Tu QR personal por si el docente te registra a vos."),
+    ])
 
     nombres = ["Dar presente", "Unirme a una materia", "Mi historial", "Mi credencial"]
     if opcion("justificativos_alumnos"):

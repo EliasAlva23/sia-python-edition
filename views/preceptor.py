@@ -1,7 +1,7 @@
-"""Panel de Preceptoría: registro manual excepcional, vinculación de alumnos, justificativos y consulta."""
+"""Panel de Preceptoría: asistencia (registro manual y justificativos), docentes (alta con QR de invitación,
+clave temporal y baja), vinculación de alumnos, clases del día y consulta."""
 from __future__ import annotations
 
-import secrets
 from datetime import timedelta
 from html import escape
 
@@ -15,16 +15,20 @@ from core.reportes import (
     reporte_clase,
 )
 from core.tiempo import hoy
+from models import cuentas
 from models import justificativo as jus
 from models.asistencia import RegistroAsistencia
-from models.institucion import Institucion, asignar_rol
+from models.institucion import Institucion
 from models.materia import Materia
-from models.persona import Estudiante, Persona, RepositorioPersonas
+from models.persona import Persona, RepositorioPersonas
+from views import personal
 from views.justificativos import bandeja
 from views.styles import (
     COLORES_CONDICION,
+    ESTADO,
     encabezado,
     estado_html,
+    guia_panel,
     kpi_grid,
     mini_barra,
     mostrar_errores,
@@ -38,25 +42,38 @@ NOMBRE_ESTADO = {"presente": "Presente", "tarde": "Tarde", "justificado": "Justi
 
 def render(preceptor: Persona) -> None:
     institucion = Institucion.obtener(st.session_state["institucion_id"])
-    encabezado("Preceptoría", "Registro manual, vinculación de alumnos y justificativos")
+    encabezado("Panel de Preceptoría", "Supervisás docentes y materias y cuidás la asistencia de la institución")
     materias = Materia.de_institucion(institucion.id)
     pendientes = len(jus.listar(institucion.id, "pendiente"))
     abiertas_hoy = sum(1 for m in materias if (c := m.clase_de_hoy()) and c["abierta"])
+    docentes = cuentas.personal_con_estado(institucion, "docente")
+    sin_activar = int(docentes["pendiente"].sum()) if not docentes.empty else 0
     kpi_grid([
         ("Materias activas", len(materias), institucion.nombre_corto, "neutro"),
         ("Clases abiertas hoy", abiertas_hoy, f"{hoy():%d/%m/%Y}", "neutro"),
+        ("Docentes", len(docentes), f"{sin_activar} sin activar su acceso" if sin_activar else "todos con acceso activo",
+         "ambar" if sin_activar else "neutro"),
         ("Justificativos pendientes", pendientes, "para revisar", "ambar" if pendientes else "neutro"),
     ])
-    tabs = st.tabs(["Registro manual", "Vincular alumno", "Justificativos", "Clases de hoy", "Consultar alumno"])
+    guia_panel([
+        ("Registro manual", "Cargá presentes, tardes o ausentes de cualquier día."),
+        ("Docentes", "Alta con QR de invitación, clave temporal y bajas."),
+        ("Justificativos", "Aprobá certificados o justificá a varios a la vez."),
+        ("Clases de hoy", "Qué materias abrieron la clase y cuántos vinieron."),
+    ])
+    tabs = st.tabs(["Registro manual", "Docentes", "Justificativos", "Clases de hoy", "Vincular alumno",
+                    "Consultar alumno"])
     with tabs[0]:
         _registro_manual(preceptor, institucion, materias)
     with tabs[1]:
-        _vincular(preceptor, institucion, materias)
+        _docentes(preceptor, institucion, docentes)
     with tabs[2]:
         _justificativos(preceptor, institucion, materias)
     with tabs[3]:
         _clases_de_hoy(materias)
     with tabs[4]:
+        _vincular(preceptor, institucion, materias)
+    with tabs[5]:
         _consultar_alumno(institucion)
 
 
@@ -133,8 +150,9 @@ def _registro_manual(preceptor: Persona, institucion: Institucion, materias: lis
 
 # ---------------------------------------------------------------- vincular alumno
 def _vincular(preceptor: Persona, institucion: Institucion, materias: list[Materia]) -> None:
-    st.caption("Para alumnos que no pudieron inscribirse solos (faltas de vinculación). Si todavía no tienen cuenta, "
-               "se crea con una contraseña temporal que el alumno debe cambiar al ingresar.")
+    st.caption("Para alumnos que no pudieron inscribirse solos. Si todavía no tienen cuenta, se crea con una clave "
+               "temporal y un QR de invitación; al ingresar, el alumno crea su propia contraseña.")
+    personal.tarjeta_credencial("pre_alumno")
     materia = _elegir_materia(materias, "vin", institucion)
     if materia is None:
         return
@@ -170,18 +188,85 @@ def _vincular(preceptor: Persona, institucion: Institucion, materias: list[Mater
     if errores:
         mostrar_errores(errores)
         return
-    temporal = f"Sia{secrets.randbelow(900000) + 100000}{secrets.choice('abcdefghjkmnpqrstuvwxyz')}"
     try:
-        nuevo = Estudiante(dni, val.limpiar(nombre), val.limpiar(apellido), email.strip())
-        nuevo.establecer_password(temporal)
-        RepositorioPersonas.registrar(nuevo)
+        alta = cuentas.crear_o_asignar(institucion.id, "estudiante", dni, val.limpiar(nombre), val.limpiar(apellido),
+                                       email.strip(), creado_por=preceptor.id)
     except ValueError as exc:
         mostrar_errores([str(exc)])
         return
-    asignar_rol(nuevo.id, institucion.id, "estudiante")
-    materia.inscribir(nuevo.id)
-    st.success(f"Cuenta creada e inscripta en {materia.nombre}. Contraseña temporal (se muestra una sola vez): "
-               f"**{temporal}** — el alumno ingresa con su DNI y debe cambiarla desde la barra lateral.")
+    materia.inscribir(alta.persona.id)
+    personal.guardar_credencial("pre_alumno", alta.persona, "estudiante", alta.clave_temporal, alta.invitacion,
+                                institucion)
+    st.toast(f"Cuenta creada e inscripta en {materia.nombre}")
+    st.rerun()
+
+
+# ---------------------------------------------------------------- docentes
+def _docentes(preceptor: Persona, institucion: Institucion, docentes) -> None:
+    personal.tarjeta_credencial("pre_docente")
+    st.markdown("#### Docentes de la institución")
+    st.caption("«Pendiente de activar» significa que todavía no creó su contraseña: entregale la clave temporal o el "
+               "QR de invitación. Si pierde el acceso, restablecelo desde «Supervisar o gestionar un docente».")
+    tabla_html(
+        [{"docente": f"{f.apellido}, {f.nombre}", "dni": f.dni, "materias": int(f.materias),
+          "acceso": estado_html("Pendiente de activar", ESTADO["advertencia"]) if f.pendiente
+          else estado_html("Activo", ESTADO["bueno"]),
+          "ingreso": cuentas.momento_legible(f.ultimo_uso)} for f in docentes.itertuples()],
+        {"docente": "Docente", "dni": "DNI", "materias": "Materias", "acceso": "Acceso", "ingreso": "Última actividad"},
+        vacio="Todavía no hay docentes. Dalos de alta con el formulario de abajo.",
+    )
+    alta, gestion = st.columns([1, 1.15], gap="medium")
+    with alta:
+        personal.form_alta(institucion, ("docente",), "pre_docente", preceptor.id, titulo="Dar de alta un docente")
+    with gestion:
+        docente_id = _gestionar_docente(preceptor, institucion, docentes)
+    if docente_id is not None:
+        _materias_del_docente(docente_id, institucion)
+
+
+def _materias_del_docente(docente_id: int, institucion: Institucion) -> None:
+    st.markdown("##### Materias del docente elegido")
+    filas = []
+    for m in Materia.de_docente(docente_id, institucion.id):
+        clase = m.clase_de_hoy()
+        hoy_txt = "Sin abrir" if clase is None else ("Abierta" if clase["abierta"] else "Cerrada")
+        filas.append({"materia": m.nombre, "curso": m.curso_comision or None, "horario": m.dia_horario or None,
+                      "alumnos": len(m.alumnos()), "hoy": hoy_txt})
+    tabla_html(filas, {"materia": "Materia", "curso": "Curso", "horario": "Horario", "alumnos": "Alumnos",
+                       "hoy": "Clase de hoy"}, vacio="No tiene materias activas en la institución.")
+
+
+def _gestionar_docente(preceptor: Persona, institucion: Institucion, docentes) -> int | None:
+    with st.container(border=True):
+        st.markdown("##### Supervisar o gestionar un docente")
+        if docentes.empty:
+            st.caption("Cuando des de alta docentes, vas a poder ver sus materias, restablecer su acceso o darlos de baja.")
+            return None
+        nombres = {int(f.id): f"{f.apellido}, {f.nombre} · DNI {f.dni}" for f in docentes.itertuples()}
+        docente_id = st.selectbox("Docente", list(nombres), format_func=nombres.get, key="pre_doc_sel")
+        st.caption("Sus materias se muestran debajo. Desde acá podés restablecer su acceso o darlo de baja.")
+        c1, c2 = st.columns(2)
+        if cuentas.puede_gestionar_clave(docente_id, institucion.id):
+            if c1.button("Restablecer acceso", key=f"pre_reset_{docente_id}", icon=":material/key:", width="stretch",
+                         help="Genera una clave temporal y un QR de invitación nuevos y cierra sus sesiones abiertas."):
+                temporal, token = cuentas.restablecer_clave(docente_id, institucion.id, "docente", preceptor.id)
+                persona = RepositorioPersonas.obtener(docente_id)
+                personal.guardar_credencial("pre_docente", persona, "docente", temporal, token, institucion,
+                                            motivo="restablecer")
+                st.rerun()
+        else:
+            c1.caption("Su cuenta también se usa en otro rol o institución: el acceso lo restablece la "
+                       "Administración general.")
+        with c2.popover("Dar de baja", icon=":material/person_remove:", width="stretch"):
+            st.markdown(f"**{escape(nombres[docente_id])}**")
+            st.caption("Deja de tener acceso como docente en esta institución y se cierran sus sesiones. Sus materias "
+                       "y el historial de asistencia se conservan para consulta.")
+            confirmar = st.checkbox("Confirmo la baja", key=f"pre_baja_ok_{docente_id}")
+            if st.button("Dar de baja", type="primary", disabled=not confirmar, key=f"pre_baja_{docente_id}"):
+                cuentas.dar_de_baja(docente_id, institucion.id, "docente")
+                st.toast("Docente dado de baja")
+                st.rerun()
+    return docente_id
 
 
 # ---------------------------------------------------------------- justificativos

@@ -18,13 +18,13 @@ from typing import Iterator
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = Path(os.environ.get("SIA_DB_PATH", BASE_DIR / "database.db"))
-SCHEMA_VERSION = "4"
+SCHEMA_VERSION = "5"
 ROLES = ("estudiante", "docente", "preceptor", "directivo")
 
 TABLAS = (
     "config", "instituciones", "carreras", "usuarios", "membresias", "docente_carreras", "materias",
     "inscripciones", "clases", "asistencias", "justificativos", "sesiones", "intentos_login",
-    "materia_programas", "clase_reportes",
+    "materia_programas", "clase_reportes", "invitaciones",
 )
 
 # Definiciones de las tablas que cambiaron su CHECK (se reconstruyen en bases existentes).
@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
     legajo        TEXT,
     departamento  TEXT,
     activo        INTEGER NOT NULL DEFAULT 1,
-    creado_en     TEXT NOT NULL
+    creado_en     TEXT NOT NULL,
+    debe_cambiar_password INTEGER NOT NULL DEFAULT 0
 )"""
 
 _ASISTENCIAS = """
@@ -193,6 +194,18 @@ CREATE TABLE IF NOT EXISTS materia_programas (
     subido_en  TEXT NOT NULL
 );
 
+-- Invitaciones de un solo uso (QR de alta del personal): se guarda solo el hash del token.
+CREATE TABLE IF NOT EXISTS invitaciones (
+    token_hash     TEXT PRIMARY KEY,
+    usuario_id     INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    institucion_id INTEGER NOT NULL REFERENCES instituciones(id) ON DELETE CASCADE,
+    rol            TEXT NOT NULL,
+    creado_por     INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+    creado_en      TEXT NOT NULL,
+    expira_en      TEXT NOT NULL,
+    usada_en       TEXT
+);
+
 -- Reporte PDF generado al cerrar cada clase (para Preceptoría).
 CREATE TABLE IF NOT EXISTS clase_reportes (
     clase_id    INTEGER PRIMARY KEY REFERENCES clases(id) ON DELETE CASCADE,
@@ -211,10 +224,14 @@ CREATE INDEX IF NOT EXISTS idx_materias_inst    ON materias(institucion_id, acti
 CREATE INDEX IF NOT EXISTS idx_membresias_inst  ON membresias(institucion_id, rol);
 CREATE INDEX IF NOT EXISTS idx_justif_inst      ON justificativos(institucion_id, estado);
 CREATE INDEX IF NOT EXISTS idx_sesiones_usuario ON sesiones(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_invitaciones_usr ON invitaciones(usuario_id, institucion_id);
 """
 
 # Columnas agregadas en versiones posteriores: se crean en bases existentes sin perder datos.
 _MIGRACIONES = {
+    "usuarios": {
+        "debe_cambiar_password": "INTEGER NOT NULL DEFAULT 0",
+    },
     "materias": {
         "curso": "TEXT NOT NULL DEFAULT ''",
         "comision": "TEXT NOT NULL DEFAULT ''",

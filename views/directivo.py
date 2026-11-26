@@ -1,27 +1,23 @@
 """Panel de Rectoría / Dirección general: vista ejecutiva, carreras, personal y configuración institucional."""
 from __future__ import annotations
 
-import secrets
 from datetime import timedelta
-from html import escape
 
 import pandas as pd
 import streamlit as st
 
-from core import validaciones as val
 from core.database import get_connection
 from core.tiempo import hoy
 from models.institucion import (
     NOMBRES_ROL,
     ROLES_PERSONAL,
     Institucion,
-    asignar_rol,
     quitar_rol,
 )
 from models.materia import Materia
-from models.persona import Directivo, Docente, Persona, Preceptor, RepositorioPersonas
+from models.persona import Persona
 from models.predictor_ia import PredictorRiesgoIA
-from views import graficos
+from views import graficos, personal
 from views.config_institucion import form_identidad, form_umbrales
 from views.exportar import exportaciones
 from views.styles import (
@@ -29,20 +25,25 @@ from views.styles import (
     COLORES_NIVEL,
     encabezado,
     estado_html,
+    guia_panel,
     kpi_grid,
     mini_barra,
-    mostrar_errores,
     tabla_html,
     tono_porcentaje,
 )
 
 PERIODOS = {"Últimos 30 días": 30, "Últimos 90 días": 90, "Todo el ciclo": None}
-CLASES_PERSONAL = {"docente": Docente, "preceptor": Preceptor, "directivo": Directivo}
 
 
 def render(directivo: Persona) -> None:
     inst = Institucion.obtener(st.session_state["institucion_id"])
-    encabezado("Rectoría · Dirección general", "Vista ejecutiva de asistencia, regularidad y promoción")
+    encabezado("Panel de Rectoría · Dirección", "Cómo viene la asistencia, la regularidad y la promoción")
+    guia_panel([
+        ("Resumen institucional", "Indicadores, gráficos y alumnos en riesgo, por período."),
+        ("Carreras y materias", "Carreras activas y qué carreras tiene cada docente."),
+        ("Personal", "Alta de Preceptoría, docentes y Dirección con QR de invitación."),
+        ("Configuración", "Porcentajes para regularizar y promocionar, logo y colores."),
+    ])
     tabs = st.tabs(["Resumen institucional", "Carreras y materias", "Personal", "Configuración"])
     with tabs[0]:
         _resumen(inst)
@@ -220,21 +221,22 @@ def _carreras(inst: Institucion) -> None:
 
 # ---------------------------------------------------------------- personal
 def _personal(inst: Institucion, directivo: Persona) -> None:
-    personal = inst.personas()
-    personal = personal[personal["rol"].isin(ROLES_PERSONAL)]
+    plantel = inst.personas()
+    plantel = plantel[plantel["rol"].isin(ROLES_PERSONAL)]
     st.markdown("#### Personal de la institución")
     tabla_html([{"nombre": f"{f.apellido}, {f.nombre}", "dni": f.dni, "email": f.email, "rol": NOMBRES_ROL[f.rol]}
-                for f in personal.itertuples()],
+                for f in plantel.itertuples()],
                {"nombre": "Nombre", "dni": "DNI", "email": "Email", "rol": "Rol"}, vacio="Todavía no hay personal cargado.")
+    personal.tarjeta_credencial("dir_personal")
     c1, c2 = st.columns(2)
     with c1:
-        _alta_personal(inst)
+        personal.form_alta(inst, ROLES_PERSONAL, "dir_personal", directivo.id, titulo="Asignar un rol o dar de alta")
     with c2:
-        if not personal.empty:
+        if not plantel.empty:
             with st.form("form_quitar_rol"):
                 st.markdown("##### Quitar un rol")
-                opciones = [(int(f.id), f.rol) for f in personal.itertuples()]
-                nombres = {(int(f.id), f.rol): f"{f.apellido}, {f.nombre} · {NOMBRES_ROL[f.rol]}" for f in personal.itertuples()}
+                opciones = [(int(f.id), f.rol) for f in plantel.itertuples()]
+                nombres = {(int(f.id), f.rol): f"{f.apellido}, {f.nombre} · {NOMBRES_ROL[f.rol]}" for f in plantel.itertuples()}
                 elegido = st.selectbox("Persona y rol", opciones, format_func=nombres.get)
                 if st.form_submit_button("Quitar rol"):
                     if elegido == (directivo.id, "directivo"):
@@ -243,46 +245,3 @@ def _personal(inst: Institucion, directivo: Persona) -> None:
                         quitar_rol(elegido[0], inst.id, elegido[1])
                         st.toast("Rol quitado")
                         st.rerun()
-
-
-def _alta_personal(inst: Institucion) -> None:
-    with st.form("form_alta_personal", clear_on_submit=True):
-        st.markdown("##### Asignar un rol")
-        st.caption("Si la persona ya tiene cuenta (por ejemplo, en otra institución) alcanza con el DNI. Si no, "
-                   "completá sus datos y se crea con una contraseña temporal.")
-        f1 = st.columns(2)
-        dni = f1[0].text_input("DNI *", max_chars=10)
-        rol = f1[1].selectbox("Rol *", ROLES_PERSONAL, format_func=NOMBRES_ROL.get)
-        f2 = st.columns(2)
-        nombre = f2[0].text_input("Nombre (solo cuentas nuevas)")
-        apellido = f2[1].text_input("Apellido (solo cuentas nuevas)")
-        email = st.text_input("Email (solo cuentas nuevas)")
-        enviar = st.form_submit_button("Asignar", type="primary")
-    if not enviar:
-        return
-    error = val.error_dni(dni) or (None if dni.strip() else "El DNI es obligatorio.")
-    if error:
-        st.error(error)
-        return
-    persona = RepositorioPersonas.por_dni(dni)
-    temporal = None
-    if persona is None:
-        errores = val.requeridos({"Nombre": nombre, "Apellido": apellido, "Email": email})
-        errores += [e for e in (val.error_nombre(nombre, "Nombre"), val.error_nombre(apellido, "Apellido"),
-                                val.error_email(email)) if e]
-        if errores:
-            mostrar_errores(["No hay una cuenta con ese DNI: completá nombre, apellido y email.", *errores])
-            return
-        temporal = f"Sia{secrets.randbelow(900000) + 100000}{secrets.choice('abcdefghjkmnpqrstuvwxyz')}"
-        try:
-            persona = CLASES_PERSONAL[rol](dni, val.limpiar(nombre), val.limpiar(apellido), email.strip())
-            persona.establecer_password(temporal)
-            RepositorioPersonas.registrar(persona)
-        except ValueError as exc:
-            mostrar_errores([str(exc)])
-            return
-    nuevo = asignar_rol(persona.id, inst.id, rol)
-    mensaje = f"{escape(persona.nombre_completo)}: rol {NOMBRES_ROL[rol]} " + ("asignado." if nuevo else "ya estaba asignado.")
-    if temporal:
-        mensaje += f" Cuenta creada. Contraseña temporal (se muestra una sola vez): **{temporal}**."
-    st.success(mensaje)

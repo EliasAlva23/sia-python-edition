@@ -74,6 +74,8 @@ def cerrar(token: str | None) -> None:
             conn.execute("DELETE FROM sesiones WHERE token_hash = ?", (_hash(token),))
 
 
-def cerrar_todas(usuario_id: int) -> None:
+def cerrar_todas(usuario_id: int, excepto: str | None = None) -> None:
+    """Cierra todas las sesiones de la persona (salvo, opcionalmente, la del dispositivo actual)."""
     with get_connection() as conn:
-        conn.execute("DELETE FROM sesiones WHERE usuario_id = ?", (usuario_id,))
+        conn.execute("DELETE FROM sesiones WHERE usuario_id = ? AND token_hash <> ?",
+                     (usuario_id, _hash(excepto) if excepto else ""))

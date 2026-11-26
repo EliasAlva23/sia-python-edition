@@ -2,6 +2,7 @@
 
 Ejecutar:  streamlit run app.py
 Enlace por institución:  https://<app>/?i=<identificador>   (ej. ?i=ies11)
+Invitación del personal:  https://<app>/?invitacion=<token de un solo uso>  (QR que genera Preceptoría)
 """
 from __future__ import annotations
 
@@ -61,6 +62,11 @@ def _capturar_enlace_qr() -> None:
     sin que expire la ventana de 30 s del QR dinámico.
     """
     parametros = st.query_params
+    if "invitacion" in parametros:
+        token = parametros["invitacion"]
+        del st.query_params["invitacion"]
+        auth.abrir_invitacion(token)
+        return
     if "asistencia" in parametros:
         clase_id, error = RegistroAsistencia.validar_token_clase(parametros["asistencia"])
         accion = {"tipo": "asistencia", "clase_id": clase_id, "error": error,
@@ -120,6 +126,9 @@ def main() -> None:
     persona = auth.usuario_actual()
     if persona is None:
         auth.render_acceso()  # aplica la identidad de la institución elegida
+    elif auth.debe_cambiar_password(persona):
+        inyectar_css()
+        auth.render_cambio_obligatorio(persona)  # primer ingreso o clave restablecida: antes que cualquier panel
     else:
         inyectar_css()
         _barra_lateral(persona)

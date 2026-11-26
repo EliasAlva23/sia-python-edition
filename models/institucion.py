@@ -270,8 +270,7 @@ def es_superadmin(dni: str) -> bool:
 
 # ---------------------------------------------------------------- opciones del sistema
 OPCIONES = {
-    "registro_estudiantes": ("Permitir que los estudiantes creen su cuenta", True),
-    "registro_docentes": ("Permitir que los docentes creen su cuenta (con el código de su institución)", True),
+    "registro_estudiantes": ("Permitir que los estudiantes creen su acceso desde el QR de una clase", True),
     "autoinscripcion_qr": ("Inscribir automáticamente al escanear el QR de asistencia", True),
     "prediccion_ia": ("Usar el modelo de IA para estimar el riesgo (si no, solo reglas de asistencia)", True),
     "justificativos_alumnos": ("Permitir que los estudiantes suban justificativos", True),

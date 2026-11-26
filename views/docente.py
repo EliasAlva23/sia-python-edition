@@ -55,6 +55,7 @@ from views.styles import (
     encabezado,
     estado_html,
     grilla_historial,
+    guia_panel,
     kpi_grid,
     leyenda_historial,
     mini_barra,
@@ -79,10 +80,16 @@ def _institucion() -> Institucion:
 def render(docente: Docente) -> None:
     institucion = _institucion()
     carreras = institucion.carreras_de_docente(docente.id)
-    encabezado("Panel docente", " · ".join(n for _, n in carreras) or "Materias, asistencia e historial")
+    encabezado("Panel docente", " · ".join(n for _, n in carreras) or "Tus materias, tus clases y la asistencia")
     materias = _filtrar_por_carrera(Materia.de_docente(docente.id, institucion.id), carreras)
     _banner_riesgo(materias)
     materia = _selector_materia(materias)
+    guia_panel([
+        ("Materias", "Tus materias con horario, alumnos y el QR para inscribirse."),
+        ("Clase en vivo", "Abrí la clase de hoy: proyectá el QR y los alumnos dan el presente."),
+        ("Lector QR", "Escaneá la credencial de un alumno o cargá su DNI."),
+        (TAB_HISTORIAL, "Asistencia por clase y alumno, y quiénes están en riesgo."),
+    ])
 
     tabs = st.tabs(["Materias", "Clase en vivo", "Lector QR", TAB_HISTORIAL, "Justificativos"])
     with tabs[0]:
@@ -399,6 +406,7 @@ def _qr_dinamico(clase_id: int) -> None:
     registro = RegistroAsistencia(clase_id)
     with st.container(border=True):
         st.markdown("**QR de asistencia** — proyectalo para que los alumnos lo escaneen")
+        st.caption("Quien todavía no tiene cuenta puede crear su acceso al escanearlo.")
         st.image(generar_qr_png(contenido_asistencia(registro.generar_token()), box_size=12), width="stretch")
         restante = segundos_restantes()
         st.progress(restante / VENTANA_SEGUNDOS, text=f"Código firmado · cambia en {restante} s")

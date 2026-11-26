@@ -313,10 +313,26 @@ class RepositorioPersonas:
     def cambiar_password(cls, persona: Persona, actual: str, nueva: str) -> None:
         if not persona.verificar_password(actual):
             raise ValueError("La contraseña actual no es correcta.")
+        cls.guardar_password(persona, nueva)
+
+    @classmethod
+    def guardar_password(cls, persona: Persona, nueva: str, temporal: bool = False) -> None:
+        """Guarda una contraseña nueva. `temporal=True` obliga a cambiarla en el próximo ingreso."""
         persona.establecer_password(nueva)
         password_hash, salt = persona._credenciales()
         with get_connection() as conn:
             conn.execute(
-                "UPDATE usuarios SET password_hash = ?, salt = ? WHERE id = ?",
-                (password_hash, salt, persona.id),
+                "UPDATE usuarios SET password_hash = ?, salt = ?, debe_cambiar_password = ? WHERE id = ?",
+                (password_hash, salt, int(temporal), persona.id),
             )
+
+    @staticmethod
+    def debe_cambiar_password(usuario_id: int) -> bool:
+        with get_connection() as conn:
+            fila = conn.execute("SELECT debe_cambiar_password FROM usuarios WHERE id = ?", (usuario_id,)).fetchone()
+        return bool(fila and fila["debe_cambiar_password"])
+
+    @staticmethod
+    def marcar_cambio_obligatorio(usuario_id: int, obligatorio: bool = True) -> None:
+        with get_connection() as conn:
+            conn.execute("UPDATE usuarios SET debe_cambiar_password = ? WHERE id = ?", (int(obligatorio), usuario_id))

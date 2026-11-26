@@ -14,13 +14,24 @@ con **Random Forest** (`scikit-learn`).
 
 | Perfil | Qué hace |
 |---|---|
-| Estudiante | Da el presente (QR/PIN), se une a materias, ve su historial y condición, presenta justificativos |
-| Docente | Materias por carrera, clase en vivo, lector QR, estadísticas, riesgo IA, revisa justificativos |
-| Preceptoría | Registro manual (alumnos sin dispositivo, días anteriores), vincula alumnos, justificación masiva, clases del día |
+| Estudiante | Da el presente (QR/PIN), se une a materias, ve su historial y condición, presenta justificativos. Crea su acceso desde el QR de una clase |
+| Docente | Materias por carrera, clase en vivo con QR de asistencia, lector QR, estadísticas, riesgo IA, revisa justificativos |
+| Preceptoría | Supervisa docentes y materias, alta de docentes con QR de invitación, restablece accesos y da de baja; registro manual, justificativos, vincula alumnos, clases del día |
 | Rectoría / Dirección | Resumen ejecutivo por carrera y materia, condición de cursadas, reporte institucional, carreras, personal, umbrales e identidad visual |
-| Administración general | Alta y edición de instituciones, roles de cualquier persona, funciones habilitadas, aviso global |
+| Administración general | Instituciones (nombre, logo, colores, enlace `?i=`, activar/suspender), alta de Preceptoría y Dirección, roles y accesos de cualquier persona, funciones habilitadas, aviso global |
 
 La **Administración general** se otorga solo por Secrets (`SIA_SUPERADMINS = "dni1,dni2"`), nunca desde la app.
+
+**Acceso sin registro público:** la pantalla de ingreso solo pide usuario (DNI o email) y contraseña.
+- Personal: Preceptoría (o Dirección / Administración general) lo da de alta; el sistema genera su usuario (DNI),
+  una clave temporal y un **QR de invitación** de un solo uso (vence a las 72 h). Al escanearlo entra directo a
+  «Creá tu contraseña»; con la clave temporal, también. El cambio es obligatorio antes de ver el panel.
+- Estudiantes: si no tienen cuenta, la crean desde el **QR de una clase** (o de inscripción) que proyecta el docente;
+  al terminar se registra el presente automáticamente.
+- Administración general: DNI en `SIA_SUPERADMINS`. Si todavía no tiene cuenta, el primer ingreso usa
+  `SIA_SUPERADMIN_CLAVE_INICIAL` (solo en Secrets) y luego obliga a cambiarla.
+
+**Pruebas:** `pip install pytest ruff` y luego `python -m pytest` y `python -m ruff check .`
 
 **Sesiones persistentes:** al ingresar se guarda una cookie con un token aleatorio (en la base solo se guarda su
 hash SHA-256). Recargar la página no cierra la sesión; expira tras `SIA_SESSION_MINUTES` sin actividad
@@ -54,7 +65,8 @@ docs/               informes del sistema (.md y .pdf)
 
 - Paleta base: azul marino profundo `#142033`, azul acero `#2E5772`, verde azulado `#3F7C70`, verde oliva `#70812B`
   y fondo claro suave `#EEF0EC`, ofrecida como paletas sugeridas al configurar cada institución.
-- Diseño sobrio: superficies planas, bordes finos, sin degradés; claro por defecto.
+- Diseño sobrio: superficies apenas teñidas (nunca blanco puro) con bordes definidos; las formas orgánicas en degradé
+  se reservan para la pantalla de acceso y, muy sutiles, para el encabezado de cada panel. Claro por defecto.
 - **Indicadores en tarjetas circulares** (anillo proporcional al dato) en todos los paneles.
 - Tipografía Plus Jakarta Sans, con Inter y la fuente del sistema como respaldo.
 - El color principal y el logo vienen de la institución activa (los configura Dirección o la Administración

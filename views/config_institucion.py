@@ -65,27 +65,25 @@ def form_identidad(inst: Institucion, clave: str, permitir_slug: bool = False) -
 
 
 def form_umbrales(inst: Institucion, clave: str) -> None:
-    """Porcentajes institucionales para regularizar y promocionar, tolerancia de llegada tarde y alta docente."""
+    """Porcentajes institucionales para regularizar y promocionar y tolerancia de llegada tarde.
+
+    (El antiguo «código de alta docente» ya no se usa: los docentes los da de alta Preceptoría con un QR.)"""
     with st.form(f"{clave}_umbrales"):
         u1, u2 = st.columns(2)
         regular = u1.slider("Asistencia mínima para regularizar (%)", 50, 100, int(inst.umbral_regular), step=5)
         promocion = u2.slider("Asistencia mínima para promocionar (%)", 50, 100, int(inst.umbral_promocion), step=5)
-        t1, t2 = st.columns(2)
-        tolerancia = t1.selectbox("Tolerancia para registrar «tarde»", TOLERANCIAS_TARDE,
+        tolerancia = st.selectbox("Tolerancia para registrar «tarde»", TOLERANCIAS_TARDE,
                                   index=TOLERANCIAS_TARDE.index(inst.tolerancia_tarde) if inst.tolerancia_tarde in TOLERANCIAS_TARDE else 1,
                                   format_func=lambda m: "Sin tolerancia" if m == 0 else f"{m} minutos",
                                   help="Pasado el inicio de la materia más esta tolerancia, el presente por QR o PIN "
                                        "se registra como «tarde».")
-        codigo = t2.text_input("Código de alta docente", value=inst.codigo_docente, type="password", max_chars=60,
-                               help="Si se completa, los docentes lo necesitan para crear su cuenta.")
         aplicar = st.checkbox("Aplicar también los umbrales a todas las materias activas",
                               help="Si no se marca, rigen solo para las materias nuevas.")
         guardar = st.form_submit_button("Guardar configuración académica", type="primary")
     if not guardar:
         return
     try:
-        inst.actualizar(umbral_regular=regular, umbral_promocion=promocion, tolerancia_tarde=tolerancia,
-                        codigo_docente=codigo)
+        inst.actualizar(umbral_regular=regular, umbral_promocion=promocion, tolerancia_tarde=tolerancia)
     except ValueError as exc:
         mostrar_errores(str(exc).split("\n"))
         return

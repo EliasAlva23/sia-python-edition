@@ -53,6 +53,27 @@ def url_publica() -> str | None:
     return f"{partes.scheme}://{partes.netloc}{partes.path}".rstrip("/")
 
 
+def url_app() -> str:
+    """URL base de la app (pública si existe; si no, la local del navegador) para enlaces de invitación."""
+    base = url_publica()
+    if base:
+        return base
+    try:
+        import streamlit as st
+
+        partes = urlparse(st.context.url or "")
+        if partes.scheme and partes.netloc:
+            return f"{partes.scheme}://{partes.netloc}{partes.path}".rstrip("/")
+    except Exception:  # fuera de un navegador (pruebas, scripts)
+        pass
+    return "http://localhost:8501"
+
+
+def contenido_invitacion(token: str) -> str:
+    """Enlace del QR de invitación del personal (un solo uso): abre la app en «Creá tu contraseña»."""
+    return f"{url_app()}/?{urlencode({'invitacion': token})}"
+
+
 def contenido_inscripcion(codigo: str, firma: str, payload: str) -> str:
     base = url_publica()
     return f"{base}/?{urlencode({'inscribir': codigo, 'f': firma})}" if base else payload
