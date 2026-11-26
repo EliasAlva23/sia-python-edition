@@ -13,17 +13,19 @@ from __future__ import annotations
 import hmac
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 import pandas as pd
 
 from core import security
 from core.database import get_connection
-from core.tiempo import ahora_iso, hoy
+from core.tiempo import ahora, ahora_iso, hoy
 from models.persona import Estudiante, Persona, RepositorioPersonas
 
 VENTANA_SEGUNDOS = 30
 ESTADOS = ("presente", "tarde", "justificado")
-METODOS = ("qr_credencial", "qr_clase", "pin", "manual")
+METODOS = ("qr_credencial", "qr_clase", "pin", "manual", "preceptoria", "justificativo")
+_AUTOMATICOS = ("qr_credencial", "qr_clase", "pin")  # se les aplica la tolerancia de llegada tarde
 
 
 @dataclass(frozen=True)
@@ -84,30 +86,43 @@ class RegistroAsistencia:
         registrado_por: int | None,
         estado: str = "presente",
         docente_id: int | None = None,
+        institucion_id: int | None = None,
+        forzar: bool = False,
     ) -> ResultadoMarcado:
+        """Registra la asistencia (idempotente).
+
+        forzar: Preceptoría puede registrar en clases cerradas o de días anteriores (alumnos sin dispositivo,
+        problemas de conectividad). institucion_id: limita el registro a clases de esa institución.
+        """
         if estado not in ESTADOS or metodo not in METODOS:
             return ResultadoMarcado(False, "error", "Estado o método inválido.")
         with get_connection() as conn:
             clase = conn.execute(
-                """SELECT c.id, c.abierta, c.fecha, c.materia_id, m.docente_id, m.nombre
-                   FROM clases c JOIN materias m ON m.id = c.materia_id WHERE c.id = ?""",
+                """SELECT c.id, c.abierta, c.fecha, c.materia_id, m.docente_id, m.nombre, m.hora_inicio,
+                          m.institucion_id, COALESCE(i.tolerancia_tarde, 10) AS tolerancia
+                   FROM clases c JOIN materias m ON m.id = c.materia_id
+                   LEFT JOIN instituciones i ON i.id = m.institucion_id WHERE c.id = ?""",
                 (self._clase_id,),
             ).fetchone()
             if clase is None:
                 return ResultadoMarcado(False, "error", "La clase no existe.")
             if docente_id is not None and clase["docente_id"] != docente_id:
                 return ResultadoMarcado(False, "error", "No sos el docente de esta materia.")
-            if not clase["abierta"] or clase["fecha"] != hoy().isoformat():
+            if institucion_id is not None and clase["institucion_id"] != institucion_id:
+                return ResultadoMarcado(False, "error", "La clase pertenece a otra institución.")
+            if not forzar and (not clase["abierta"] or clase["fecha"] != hoy().isoformat()):
                 return ResultadoMarcado(False, "error", "La clase no está abierta para registrar asistencia.")
             alumno = conn.execute(
                 """SELECT u.id, u.nombre, u.apellido FROM usuarios u
                    JOIN inscripciones i ON i.estudiante_id = u.id
-                   WHERE u.id = ? AND i.materia_id = ? AND u.rol = 'estudiante' AND u.activo = 1""",
+                   WHERE u.id = ? AND i.materia_id = ? AND u.activo = 1""",
                 (estudiante_id, clase["materia_id"]),
             ).fetchone()
             if alumno is None:
                 return ResultadoMarcado(False, "error", f"El alumno no está inscripto en {clase['nombre']}.")
             nombre = f"{alumno['nombre']} {alumno['apellido']}"
+            if estado == "presente" and metodo in _AUTOMATICOS:
+                estado = self._estado_por_horario(clase)
             cur = conn.execute(
                 """INSERT INTO asistencias (clase_id, estudiante_id, estado, metodo, registrado_por, registrado_en)
                    VALUES (?, ?, ?, ?, ?, ?)
@@ -121,7 +136,30 @@ class RegistroAsistencia:
                 ).fetchone()
                 hora = previo["registrado_en"][11:16] if previo else "--:--"
                 return ResultadoMarcado(True, "duplicado", f"{nombre} ya tenía presente (registrado {hora}).", nombre)
+        if estado == "tarde" and metodo in _AUTOMATICOS:
+            return ResultadoMarcado(True, "registrado", f"Registrado con llegada tarde: {nombre}.", nombre)
         return ResultadoMarcado(True, "registrado", f"Presente registrado: {nombre}.", nombre)
+
+    @staticmethod
+    def _estado_por_horario(clase) -> str:
+        """«tarde» si se registra después del inicio de la materia más la tolerancia de la institución."""
+        if not clase["hora_inicio"] or clase["fecha"] != hoy().isoformat():
+            return "presente"
+        inicio = datetime.combine(hoy(), datetime.strptime(clase["hora_inicio"], "%H:%M").time())
+        return "tarde" if ahora() > inicio + timedelta(minutes=int(clase["tolerancia"])) else "presente"
+
+    def registrar_estado(self, estudiante_id: int, estado: str | None, registrado_por: int,
+                         institucion_id: int | None = None) -> None:
+        """Preceptoría: fija el estado de un alumno en una clase (None o «ausente» borra el registro)."""
+        if estado in (None, "ausente"):
+            self.anular(estudiante_id)
+            return
+        resultado = self.marcar(estudiante_id, "preceptoria", registrado_por, estado=estado,
+                                institucion_id=institucion_id, forzar=True)
+        if resultado.estado == "duplicado":
+            self.actualizar_estado(estudiante_id, estado)
+        elif not resultado.ok:
+            raise ValueError(resultado.mensaje)
 
     def actualizar_estado(self, estudiante_id: int, estado: str) -> None:
         if estado not in ESTADOS:
@@ -151,7 +189,7 @@ class RegistroAsistencia:
         self, dni: str, docente_id: int, metodo: str = "manual", estado: str = "presente"
     ) -> ResultadoMarcado:
         persona = RepositorioPersonas.por_dni(dni)
-        if persona is None or persona.rol != "estudiante":
+        if persona is None:
             return ResultadoMarcado(False, "error", "No existe un estudiante con ese DNI.")
         return self.marcar(persona.id, metodo, docente_id, estado=estado, docente_id=docente_id)
 

@@ -40,24 +40,38 @@ def texto_pdf(valor) -> str:
     return texto.encode("latin-1", "replace").decode("latin-1")
 
 
+def _rgb(color: str | None) -> tuple[int, int, int]:
+    try:
+        return tuple(int(color.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+    except (AttributeError, ValueError):
+        return AZUL_NOCHE
+
+
 class _PDF(FPDF):
-    def __init__(self, titulo: str) -> None:
+    def __init__(self, titulo: str, institucion: str = INSTITUCION, logo: bytes | None = None,
+                 color: str | None = None) -> None:
         super().__init__(format="A4")
         self._titulo = titulo
+        self._institucion = institucion
+        self._logo = io.BytesIO(logo) if logo else None
+        self._color = _rgb(color) if color else AZUL_NOCHE
         self.set_auto_page_break(auto=True, margin=18)
         self.set_margins(15, 15, 15)
         self.set_title(texto_pdf(titulo))
         self.set_author(texto_pdf(f"SIA - {INSTITUCION}"))
 
     def header(self) -> None:
-        self.set_fill_color(*AZUL_NOCHE)
+        self.set_fill_color(*self._color)
         self.rect(0, 0, self.w, 26, style="F")
-        if _LOGO is not None:
+        if self._logo is not None:
+            self._logo.seek(0)
+            self.image(self._logo, x=12, y=4, h=18)
+        elif _LOGO is not None:
             self.image(str(_LOGO), x=12, y=4, h=18)
         self.set_xy(34, 6)
         self.set_text_color(255, 255, 255)
         self.set_font("Helvetica", "B", 13)
-        self.cell(0, 7, texto_pdf(INSTITUCION), new_x="LMARGIN", new_y="NEXT")
+        self.cell(0, 7, texto_pdf(self._institucion), new_x="LMARGIN", new_y="NEXT")
         self.set_x(34)
         self.set_font("Helvetica", "", 10)
         self.cell(0, 6, texto_pdf(self._titulo))
@@ -68,7 +82,7 @@ class _PDF(FPDF):
         self.set_y(-12)
         self.set_font("Helvetica", "", 8)
         self.set_text_color(110, 120, 140)
-        self.cell(0, 6, texto_pdf(f"Generado por SIA - {INSTITUCION} - {ahora():%d/%m/%Y %H:%M}"), align="L")
+        self.cell(0, 6, texto_pdf(f"Generado por SIA - {self._institucion} - {ahora():%d/%m/%Y %H:%M}"), align="L")
         self.cell(0, 6, f"Página {self.page_no()}/{{nb}}", align="R")
 
 
@@ -76,10 +90,12 @@ def _datos_clase(clase_id: int) -> tuple[dict, pd.DataFrame]:
     with get_connection() as conn:
         clase = conn.execute(
             """SELECT c.id, c.fecha, c.tema, c.materia_id, m.nombre AS materia, m.curso, m.comision, m.turno,
-                      m.dia_horario, m.umbral, u.nombre || ' ' || u.apellido AS docente
+                      m.dia_horario, m.umbral, u.nombre || ' ' || u.apellido AS docente,
+                      COALESCE(i.nombre, ?) AS institucion, i.logo AS logo, i.color_primario AS color
                FROM clases c JOIN materias m ON m.id = c.materia_id JOIN usuarios u ON u.id = m.docente_id
+               LEFT JOIN instituciones i ON i.id = m.institucion_id
                WHERE c.id = ?""",
-            (clase_id,),
+            (INSTITUCION, clase_id),
         ).fetchone()
         if clase is None:
             raise ValueError("La clase no existe.")
@@ -101,7 +117,7 @@ def _datos_clase(clase_id: int) -> tuple[dict, pd.DataFrame]:
 def pdf_reporte_clase(clase_id: int) -> bytes:
     """Reporte de asistencia de una clase, listo para archivar en Preceptoría."""
     clase, alumnos = _datos_clase(clase_id)
-    pdf = _PDF("Reporte de asistencia de clase")
+    pdf = _PDF("Reporte de asistencia de clase", clase["institucion"], clase["logo"], clase["color"])
     pdf.alias_nb_pages()
     pdf.add_page()
 

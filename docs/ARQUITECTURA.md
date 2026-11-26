@@ -79,8 +79,13 @@ sia-python-edition/
 
 | Tabla | Contenido |
 |---|---|
-| `usuarios` | DNI, nombre, apellido, email, rol, hash y sal de la contraseña, legajo o departamento |
-| `materias` | Nombre, descripción, curso, comisión, turno, días, hora de inicio y fin, texto de horario, umbral, código de clase, docente |
+| `instituciones` | Clientes del SaaS: identificador del enlace, nombre, logo, colores, umbrales, tolerancia «tarde», código docente, activa |
+| `carreras` / `docente_carreras` | Carreras de cada institución y carreras asignadas a cada docente |
+| `usuarios` | DNI, nombre, apellido, email, rol original, hash y sal de la contraseña, legajo o departamento |
+| `membresias` | Roles de cada persona en cada institución (estudiante, docente, preceptor, directivo) |
+| `sesiones` | Hash del token de la cookie, perfil activo, vencimiento y último uso |
+| `justificativos` | Alumno, materia (o todas), período, motivo, comprobante, estado y quién lo resolvió |
+| `materias` | Nombre, descripción, curso, comisión, turno, días, hora de inicio y fin, texto de horario, umbrales de regularidad y promoción, código de clase, docente, institución y carrera |
 | `materia_programas` | Programa en PDF por materia (tabla aparte para no cargar el archivo al listar) |
 | `inscripciones` | Alumno y materia, fecha de inscripción, resultado final |
 | `clases` | Una por materia y fecha: tema, abierta o cerrada |
@@ -89,7 +94,16 @@ sia-python-edition/
 | `intentos_login` | Intentos de acceso para el bloqueo temporal |
 | `config` | Versión del esquema y clave HMAC generada si no se configuró `SIA_SECRET` |
 
-Las migraciones son automáticas: `init_db()` crea las tablas faltantes y agrega columnas nuevas a bases existentes sin perder datos (versión de esquema actual: 3).
+Las migraciones son automáticas: `init_db()` crea las tablas faltantes y agrega columnas nuevas a bases existentes sin perder datos (versión de esquema actual: 4). La migración a la v4 reconstruye las tablas cuyas restricciones `CHECK` cambiaron, crea la institución inicial (IES N° 11) y convierte el rol de cada usuario en una membresía de esa institución.
+
+### 3.2.1 Multi-institución, roles y sesiones
+
+- `models/institucion.py`: instituciones, carreras, membresías (`roles_de`, `asignar_rol`, `quitar_rol`) y opciones del sistema.
+- `core/sesiones.py`: token aleatorio en la cookie `sia_sesion`; la base guarda solo su hash SHA-256. `views/auth.py`
+  restaura la sesión desde la cookie al recargar y escribe las cookies al final de cada ejecución.
+- `app.py` rutea por perfil activo a `views/alumno.py`, `docente.py`, `preceptor.py`, `directivo.py` o `superadmin.py`.
+- `views/styles.py` genera los tokens de diseño desde los colores de la institución activa; `views/graficos.py`
+  centraliza los gráficos (una serie con el color institucional, varias con paleta categórica fija, estados con texto).
 
 ### 3.3 Asistencia por QR
 
@@ -125,7 +139,8 @@ Componente `st.components.v2` (HTML, CSS y JavaScript que corren en la página):
 | Clave | Uso |
 |---|---|
 | `SIA_SECRET` | Clave HMAC de QR y credenciales. **Obligatoria en producción.** |
-| `SIA_DOCENTE_CODE` | Código institucional para el alta de docentes (opcional). |
+| `SIA_DOCENTE_CODE` | Código de alta docente por defecto (cada institución puede definir el suyo). |
+| `SIA_SUPERADMINS` | DNIs con acceso a la Administración general, separados por comas. |
 | `SIA_PUBLIC_URL` | URL pública para que los QR sean enlaces (opcional; se detecta sola). |
 | `SIA_TZ` / `SIA_SESSION_MINUTES` | Zona horaria y minutos de inactividad (opcionales). |
 | `SIA_DRIVE_FOLDER_ID` | Carpeta de destino en Google Drive. |

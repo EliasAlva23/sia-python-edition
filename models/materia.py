@@ -10,7 +10,13 @@ import pandas as pd
 from core import security
 from core.database import get_connection
 from core.tiempo import ahora_iso, hoy
-from core.validaciones import DIAS_SEMANA, describir_horario, error_pdf, errores_materia, limpiar
+from core.validaciones import (
+    DIAS_SEMANA,
+    describir_horario,
+    error_pdf,
+    errores_materia,
+    limpiar,
+)
 
 _ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 _CODIGO_RE = re.compile(r"^SIA-[A-Z0-9]{6}$")
@@ -36,7 +42,13 @@ class Materia:
         dias: str = "",
         hora_inicio: str = "",
         hora_fin: str = "",
+        institucion_id: int | None = None,
+        carrera_id: int | None = None,
+        umbral_promocion: float = 80.0,
     ) -> None:
+        self._institucion_id = institucion_id
+        self._carrera_id = carrera_id
+        self._umbral_promocion = float(umbral_promocion)
         self._id = id
         self._curso = curso
         self._comision = comision
@@ -74,6 +86,24 @@ class Materia:
     @property
     def codigo_clase(self) -> str:
         return self._codigo_clase
+
+    @property
+    def institucion_id(self) -> int | None:
+        return self._institucion_id
+
+    @property
+    def carrera_id(self) -> int | None:
+        return self._carrera_id
+
+    @property
+    def umbral_promocion(self) -> float:
+        return self._umbral_promocion
+
+    def condicion(self, pct: float) -> str:
+        """Condición del alumno según los umbrales: Promociona, Regular o Libre."""
+        if pct >= self._umbral_promocion:
+            return "Promociona"
+        return "Regular" if pct >= self._umbral else "Libre"
 
     @property
     def umbral(self) -> float:
@@ -145,6 +175,7 @@ class Materia:
             fila["codigo_clase"], fila["umbral"], fila["activa"],
             fila["curso"], fila["turno"], fila["dia_horario"],
             fila["comision"], fila["dias"], fila["hora_inicio"], fila["hora_fin"],
+            fila["institucion_id"], fila["carrera_id"], fila["umbral_promocion"],
         )
 
     @staticmethod
@@ -172,10 +203,13 @@ class Materia:
         """Valida y limpia los datos de cursada; lanza ValueError con todos los errores juntos."""
         dias = [d for d in DIAS_SEMANA if d in (datos.get("dias") or [])]
         umbral = float(datos.get("umbral", 75))
+        promocion = float(datos.get("umbral_promocion", max(umbral, 80)))
         errores = errores_materia(datos.get("nombre", ""), datos.get("curso"), datos.get("comision"),
                                   datos.get("turno"), dias, datos.get("hora_inicio"), datos.get("hora_fin"))
-        if not 0 <= umbral <= 100:
-            errores.append("El umbral debe estar entre 0 y 100.")
+        if not 0 <= umbral <= 100 or not 0 <= promocion <= 100:
+            errores.append("Los umbrales deben estar entre 0 y 100.")
+        elif promocion < umbral:
+            errores.append("El umbral de promoción no puede ser menor que el de regularización.")
         if errores:
             raise ValueError("\n".join(errores))
         return {
@@ -189,11 +223,14 @@ class Materia:
             "hora_fin": datos["hora_fin"],
             "dia_horario": describir_horario(dias, datos["hora_inicio"], datos["hora_fin"]),
             "umbral": umbral,
+            "umbral_promocion": promocion,
+            "carrera_id": datos.get("carrera_id"),
         }
 
     @classmethod
-    def crear(cls, docente_id: int, **datos) -> "Materia":
-        """datos: nombre, descripcion, curso, comision, turno, dias (lista), hora_inicio, hora_fin, umbral."""
+    def crear(cls, docente_id: int, institucion_id: int, **datos) -> "Materia":
+        """datos: nombre, descripcion, curso, comision, turno, dias (lista), hora_inicio, hora_fin, umbral,
+        umbral_promocion, carrera_id."""
         d = cls._normalizar(datos)
         for _ in range(10):
             codigo = cls._generar_codigo()
@@ -201,11 +238,12 @@ class Materia:
                 with get_connection() as conn:
                     cur = conn.execute(
                         """INSERT INTO materias (nombre, descripcion, curso, comision, turno, dias, hora_inicio,
-                                                 hora_fin, dia_horario, docente_id, codigo_clase, umbral, creado_en)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                                 hora_fin, dia_horario, docente_id, codigo_clase, umbral, creado_en,
+                                                 institucion_id, carrera_id, umbral_promocion)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (d["nombre"], d["descripcion"], d["curso"], d["comision"], d["turno"], d["dias"],
                          d["hora_inicio"], d["hora_fin"], d["dia_horario"], docente_id, codigo, d["umbral"],
-                         ahora_iso()),
+                         ahora_iso(), institucion_id, d["carrera_id"], d["umbral_promocion"]),
                     )
                 return cls.obtener(cur.lastrowid)
             except sqlite3.IntegrityError:
@@ -230,20 +268,33 @@ class Materia:
         return cls._desde_fila(fila) if fila else None
 
     @classmethod
-    def de_docente(cls, docente_id: int) -> list["Materia"]:
+    def de_docente(cls, docente_id: int, institucion_id: int | None = None) -> list["Materia"]:
+        filtro = "AND institucion_id = ?" if institucion_id else ""
         with get_connection() as conn:
             filas = conn.execute(
-                "SELECT * FROM materias WHERE docente_id = ? AND activa = 1 ORDER BY nombre", (docente_id,)
+                f"SELECT * FROM materias WHERE docente_id = ? AND activa = 1 {filtro} ORDER BY nombre",
+                (docente_id, institucion_id) if institucion_id else (docente_id,),
             ).fetchall()
         return [cls._desde_fila(f) for f in filas]
 
     @classmethod
-    def de_estudiante(cls, estudiante_id: int) -> list["Materia"]:
+    def de_estudiante(cls, estudiante_id: int, institucion_id: int | None = None) -> list["Materia"]:
+        filtro = "AND m.institucion_id = ?" if institucion_id else ""
         with get_connection() as conn:
             filas = conn.execute(
-                """SELECT m.* FROM materias m JOIN inscripciones i ON i.materia_id = m.id
-                   WHERE i.estudiante_id = ? AND m.activa = 1 ORDER BY m.nombre""",
-                (estudiante_id,),
+                f"""SELECT m.* FROM materias m JOIN inscripciones i ON i.materia_id = m.id
+                    WHERE i.estudiante_id = ? AND m.activa = 1 {filtro} ORDER BY m.nombre""",
+                (estudiante_id, institucion_id) if institucion_id else (estudiante_id,),
+            ).fetchall()
+        return [cls._desde_fila(f) for f in filas]
+
+    @classmethod
+    def de_institucion(cls, institucion_id: int, carrera_id: int | None = None) -> list["Materia"]:
+        filtro = "AND carrera_id = ?" if carrera_id else ""
+        with get_connection() as conn:
+            filas = conn.execute(
+                f"SELECT * FROM materias WHERE institucion_id = ? AND activa = 1 {filtro} ORDER BY nombre",
+                (institucion_id, carrera_id) if carrera_id else (institucion_id,),
             ).fetchall()
         return [cls._desde_fila(f) for f in filas]
 
@@ -253,9 +304,11 @@ class Materia:
         with get_connection() as conn:
             conn.execute(
                 """UPDATE materias SET nombre = ?, descripcion = ?, umbral = ?, curso = ?, comision = ?, turno = ?,
-                                       dias = ?, hora_inicio = ?, hora_fin = ?, dia_horario = ? WHERE id = ?""",
+                                       dias = ?, hora_inicio = ?, hora_fin = ?, dia_horario = ?, umbral_promocion = ?,
+                                       carrera_id = ? WHERE id = ?""",
                 (d["nombre"], d["descripcion"], d["umbral"], d["curso"], d["comision"], d["turno"], d["dias"],
-                 d["hora_inicio"], d["hora_fin"], d["dia_horario"], self._id),
+                 d["hora_inicio"], d["hora_fin"], d["dia_horario"], d["umbral_promocion"], d["carrera_id"],
+                 self._id),
             )
         actualizada = Materia.obtener(self._id)
         self.__dict__.update(actualizada.__dict__)
@@ -309,11 +362,19 @@ class Materia:
 
     # ----- inscripciones -----
     def inscribir(self, estudiante_id: int) -> tuple[bool, str]:
-        """Idempotente: inscribir dos veces no duplica."""
+        """Idempotente: inscribir dos veces no duplica. Vincula al alumno con la institución de la materia."""
         with get_connection() as conn:
-            rol = conn.execute("SELECT rol FROM usuarios WHERE id = ?", (estudiante_id,)).fetchone()
-            if not rol or rol["rol"] != "estudiante":
+            usuario = conn.execute("SELECT rol FROM usuarios WHERE id = ? AND activo = 1", (estudiante_id,)).fetchone()
+            es_estudiante = usuario is not None and (usuario["rol"] == "estudiante" or conn.execute(
+                "SELECT 1 FROM membresias WHERE usuario_id = ? AND rol = 'estudiante'", (estudiante_id,)).fetchone())
+            if not es_estudiante:
                 return False, "Solo los estudiantes pueden inscribirse."
+            if self._institucion_id:
+                conn.execute(
+                    """INSERT OR IGNORE INTO membresias (usuario_id, institucion_id, rol, creado_en)
+                       VALUES (?, ?, 'estudiante', ?)""",
+                    (estudiante_id, self._institucion_id, ahora_iso()),
+                )
             cur = conn.execute(
                 """INSERT INTO inscripciones (materia_id, estudiante_id, inscripto_en) VALUES (?, ?, ?)
                    ON CONFLICT (materia_id, estudiante_id) DO NOTHING""",
@@ -395,6 +456,20 @@ class Materia:
             fila = conn.execute(
                 "SELECT * FROM clases WHERE materia_id = ? AND fecha = ?", (self._id, hoy().isoformat())
             ).fetchone()
+        return dict(fila) if fila else None
+
+    def clase_en_fecha(self, fecha, crear: bool = False) -> dict | None:
+        """Clase de una fecha; Preceptoría puede crearla (cerrada) para registrar asistencia de forma excepcional."""
+        iso = fecha.isoformat() if hasattr(fecha, "isoformat") else str(fecha)
+        with get_connection() as conn:
+            fila = conn.execute("SELECT * FROM clases WHERE materia_id = ? AND fecha = ?", (self._id, iso)).fetchone()
+            if fila is None and crear:
+                conn.execute(
+                    """INSERT INTO clases (materia_id, fecha, tema, abierta, creado_en)
+                       VALUES (?, ?, 'Registro de Preceptoría', 0, ?)""",
+                    (self._id, iso, ahora_iso()),
+                )
+                fila = conn.execute("SELECT * FROM clases WHERE materia_id = ? AND fecha = ?", (self._id, iso)).fetchone()
         return dict(fila) if fila else None
 
     def clases(self) -> pd.DataFrame:

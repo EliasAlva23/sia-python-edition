@@ -20,34 +20,34 @@ _HTML = """
 <div class="sia-esc">
   <div class="barra">
     <select class="camara" aria-label="Elegir cámara"></select>
-    <button type="button" class="alternar">⏸ Pausar</button>
+    <button type="button" class="alternar">Pausar</button>
   </div>
   <div class="visor">
     <video playsinline muted></video>
     <div class="mira"></div>
   </div>
   <div class="estado" role="status">Preparando cámara…</div>
-  <button type="button" class="reintentar" hidden>🔄 Reintentar</button>
+  <button type="button" class="reintentar" hidden>Reintentar</button>
 </div>
 """
 
 _CSS = """
 .sia-esc { font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif; max-width: 100%; }
 .barra { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .5rem; }
-.camara { flex: 1 1 180px; min-width: 0; max-width: 100%; padding: .45rem .6rem; border-radius: 12px;
-  border: 1px solid #7979B1; background: #fff; color: #0E2747; font: inherit; font-size: .9rem; }
-button { border-radius: 12px; border: 1px solid #346FB0; background: #346FB0; color: #fff; padding: .45rem .9rem;
-  font: inherit; font-size: .9rem; font-weight: 700; cursor: pointer; }
-button:hover { background: #7979B1; border-color: #7979B1; }
-.visor { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #003467; border-radius: 16px;
+.camara { flex: 1 1 180px; min-width: 0; max-width: 100%; padding: .45rem .6rem; border-radius: 6px;
+  border: 1px solid #D1D5DB; background: #fff; color: #111827; font: inherit; font-size: .9rem; }
+button { border-radius: 6px; border: 1px solid #D1D5DB; background: #fff; color: #111827; padding: .45rem .9rem;
+  font: inherit; font-size: .9rem; font-weight: 500; cursor: pointer; }
+button:hover { background: #F1F3F6; }
+.visor { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #111827; border-radius: 8px;
   overflow: hidden; }
 video { width: 100%; height: 100%; object-fit: cover; display: block; }
-.mira { position: absolute; inset: 18%; border: 3px solid rgba(183,143,182,.95); border-radius: 18px;
-  box-shadow: 0 0 0 9999px rgba(0,20,45,.28); transition: border-color .15s ease; pointer-events: none; }
-.sia-esc.leido .mira { border-color: #2E9E77; }
-.estado { margin-top: .5rem; font-size: .9rem; color: #0E2747; background: #F3ECF4; border-left: 5px solid #B78FB6;
-  border-radius: 10px; padding: .5rem .7rem; overflow-wrap: anywhere; }
-.estado.error { background: #FDECEC; border-left-color: #D9534F; }
+.mira { position: absolute; inset: 18%; border: 2px solid rgba(255,255,255,.9); border-radius: 10px;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,.25); transition: border-color .15s ease; pointer-events: none; }
+.sia-esc.leido .mira { border-color: #0ca30c; }
+.estado { margin-top: .5rem; font-size: .88rem; color: #374151; background: #F1F3F6; border-left: 3px solid #6B7280;
+  border-radius: 6px; padding: .5rem .7rem; overflow-wrap: anywhere; }
+.estado.error { background: #FDF2F2; border-left-color: #d03b3b; color: #7f1d1d; }
 .reintentar { margin-top: .5rem; }
 """
 
@@ -141,7 +141,7 @@ export default function (component) {
       try { if (actual) localStorage.setItem(CLAVE, actual); } catch (e) {}
       await listarCamaras(actual);
       await prepararDecodificador();
-      pausado = false; btnAlternar.textContent = '⏸ Pausar';
+      pausado = false; btnAlternar.textContent = 'Pausar';
       estado(detector ? 'Apuntá la cámara al código QR.' : 'Apuntá la cámara al código QR (lector compatible).');
       bucle();
     } catch (e) {
@@ -175,7 +175,7 @@ export default function (component) {
     ultimo = texto; ultimoTs = ahora; contador += 1;
     raiz.classList.add('leido'); setTimeout(() => raiz.classList.remove('leido'), 600);
     if (navigator.vibrate) navigator.vibrate(60);
-    estado('✅ Código leído. Procesando…');
+    estado('Código leído. Procesando…');
     setTriggerValue('codigo', { texto: texto, n: contador, ts: ahora });
   }
 
@@ -183,7 +183,7 @@ export default function (component) {
   btnReintentar.addEventListener('click', () => iniciar(select.value || null));
   btnAlternar.addEventListener('click', () => {
     if (pausado || !stream) { iniciar(select.value || null); }
-    else { pausado = true; detener(); btnAlternar.textContent = '▶ Reanudar'; estado('Cámara en pausa.'); }
+    else { pausado = true; detener(); btnAlternar.textContent = 'Reanudar'; estado('Cámara en pausa.'); }
   });
   iniciar(null);
   return () => { vivo = false; detener(); };

@@ -87,7 +87,7 @@ Arriba de las pestañas:
 | Comisión | Selector: Comisión 1 a 6 o Comisión única |
 | Turno | Selector: Mañana, Tarde o Noche |
 | Días de cursada | Selector múltiple: lunes a sábado |
-| Desde / Hasta | Selectores de horario cada 30 minutos (07:00 a 23:30); "Hasta" debe ser posterior a "Desde" |
+| Desde / Hasta | Selectores de horario cada 10 minutos (07:00 a 23:50); "Hasta" debe ser posterior a "Desde" |
 | Umbral | Control deslizante de 50 % a 100 % |
 | Descripción | Texto opcional |
 | Programa de la materia | Archivo PDF opcional (hasta 8 MB, se verifica que sea un PDF real) |
@@ -125,7 +125,34 @@ A la derecha: total de presentes y la lista de los últimos registros. Debajo de
 | Estadísticas | Tendencia semanal, asistencia por día de la semana, mapa de calor y asistencia por alumno según el nivel de riesgo. |
 | Exportar reportes | CSV, Excel (hojas Registros, Historial y Riesgo) y envío del Excel a Google Drive. |
 
-## 6. Comportamiento en celulares
+## 6. Panel de Preceptoría
+
+| Pestaña | Contenido |
+|---|---|
+| Registro manual | Materia y fecha; un selector de estado por alumno (presente, tarde, justificado, ausente) y «marcar a todos». Crea la clase si no existe y regenera el PDF si estaba cerrada. |
+| Vincular alumno | Busca por DNI e inscribe en una materia; si no tiene cuenta la crea con una contraseña temporal que se muestra una sola vez. |
+| Justificativos | Bandeja con aprobación o rechazo en lote, descarga del comprobante y justificación masiva por período y materia. |
+| Clases de hoy | Estado de las clases del día y descarga de sus PDF. |
+| Consultar alumno | Asistencia y condición de un alumno en todas sus materias. |
+
+## 7. Panel de Rectoría / Dirección
+
+| Pestaña | Contenido |
+|---|---|
+| Resumen institucional | Período (30 días, 90 días o todo el ciclo); indicadores de asistencia, promoción, regularidad, libres y riesgo; asistencia por carrera, condición por carrera (barras 100 %), tendencia semanal con la línea de regularidad, materias con menor asistencia, detalle por materia, alumnos en riesgo alto y reporte institucional. |
+| Carreras y materias | Alta y edición de carreras y asignación de carreras a cada docente. |
+| Personal | Personal con su rol; asignar rol por DNI (o crear la cuenta con contraseña temporal) y quitar roles. |
+| Configuración | Umbrales de regularidad y promoción, tolerancia de llegada tarde, código de alta docente, nombre, colores y logo (con vista previa y control de contraste). |
+
+## 8. Administración general
+
+| Pestaña | Contenido |
+|---|---|
+| Instituciones | Listado con enlace de acceso y cantidades; alta de institución (con persona a cargo de Dirección); edición de identidad y configuración; suspensión o reactivación. |
+| Usuarios y roles | Búsqueda por DNI, roles en todas las instituciones, asignar o quitar roles y cerrar sesiones. |
+| Sistema | Funciones habilitadas (registro, autoinscripción, IA, justificativos), aviso global y estado de la base. |
+
+## 9. Comportamiento en celulares
 
 - Las columnas se apilan, los indicadores pasan a dos por fila y las tablas se muestran como tarjetas.
 - Las pestañas se acomodan en varias filas, sin desplazamiento lateral.

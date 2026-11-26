@@ -175,6 +175,34 @@ class Estudiante(Persona):
         return {"legajo": self._legajo}
 
 
+class Preceptor(Persona):
+    """Preceptoría: registro manual de asistencia, vinculación de alumnos y justificativos."""
+
+    @property
+    def rol(self) -> str:
+        return "preceptor"
+
+
+class Directivo(Persona):
+    """Rectoría / Dirección general: vista ejecutiva, umbrales, carreras y personal de su institución."""
+
+    @property
+    def rol(self) -> str:
+        return "directivo"
+
+
+class Administrador(Persona):
+    """Administración general del SaaS (se asigna por Secrets: SIA_SUPERADMINS)."""
+
+    @property
+    def rol(self) -> str:
+        return "superadmin"
+
+
+_CLASE_POR_ROL = {"docente": Docente, "estudiante": Estudiante, "preceptor": Preceptor, "directivo": Directivo,
+                  "superadmin": Administrador}
+
+
 class RepositorioPersonas:
     """Persistencia y autenticación de personas en SQLite."""
 
@@ -183,7 +211,7 @@ class RepositorioPersonas:
     _HASH_SENUELO = security.hash_password("sia-senuelo-0000")
 
     @staticmethod
-    def _desde_fila(fila: sqlite3.Row) -> Persona:
+    def _desde_fila(fila: sqlite3.Row, rol: str | None = None) -> Persona:
         comunes = dict(
             dni=fila["dni"],
             nombre=fila["nombre"],
@@ -193,9 +221,12 @@ class RepositorioPersonas:
             password_hash=fila["password_hash"],
             salt=fila["salt"],
         )
-        if fila["rol"] == "docente":
+        clase = _CLASE_POR_ROL.get(rol or fila["rol"], Estudiante)
+        if clase is Docente:
             return Docente(**comunes, departamento=fila["departamento"])
-        return Estudiante(**comunes, legajo=fila["legajo"])
+        if clase is Estudiante:
+            return Estudiante(**comunes, legajo=fila["legajo"])
+        return clase(**comunes)
 
     @classmethod
     def registrar(cls, persona: Persona) -> Persona:
@@ -218,10 +249,11 @@ class RepositorioPersonas:
         return persona
 
     @classmethod
-    def obtener(cls, id: int) -> Persona | None:
+    def obtener(cls, id: int, rol: str | None = None) -> Persona | None:
+        """Persona con la clase del rol activo de la sesión (una misma cuenta puede tener varios roles)."""
         with get_connection() as conn:
             fila = conn.execute("SELECT * FROM usuarios WHERE id = ? AND activo = 1", (id,)).fetchone()
-        return cls._desde_fila(fila) if fila else None
+        return cls._desde_fila(fila, rol) if fila else None
 
     @classmethod
     def por_dni(cls, dni: str) -> Persona | None:

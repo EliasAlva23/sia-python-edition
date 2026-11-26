@@ -1,9 +1,30 @@
-# 🎓 SIA · IES N° 11 — Sistema de Asistencia Inteligente (Python Edition)
+# SIA — Sistema de Asistencia Inteligente
 
-Instituto de Educación Superior N° 11.
+Plataforma **SaaS multi-institución** en **Streamlit** para gestionar la asistencia en institutos de nivel superior:
+asistencia por QR o PIN, registro manual de Preceptoría, justificativos, condición académica
+(promoción / regularidad / libre) con umbrales configurables, reportes PDF/Excel y predicción de riesgo
+con **Random Forest** (`scikit-learn`).
 
-Aplicación web en **Streamlit** para la relación Docente–Alumno: asistencia por QR,
-ciencia de datos con `pandas` + `plotly` y predicción de riesgo con **Random Forest** (`scikit-learn`).
+## Instituciones y roles
+
+- **Marca blanca:** cada institución tiene nombre, logo y colores propios. Se accede por su enlace
+  (`…/?i=identificador`), que queda recordado en el navegador; si hay varias, el login muestra un selector.
+- **Una cuenta por persona** (DNI único) con roles por institución. Quien tiene varios perfiles los cambia
+  desde la barra lateral sin volver a ingresar.
+
+| Perfil | Qué hace |
+|---|---|
+| Estudiante | Da el presente (QR/PIN), se une a materias, ve su historial y condición, presenta justificativos |
+| Docente | Materias por carrera, clase en vivo, lector QR, estadísticas, riesgo IA, revisa justificativos |
+| Preceptoría | Registro manual (alumnos sin dispositivo, días anteriores), vincula alumnos, justificación masiva, clases del día |
+| Rectoría / Dirección | Resumen ejecutivo por carrera y materia, condición de cursadas, reporte institucional, carreras, personal, umbrales e identidad visual |
+| Administración general | Alta y edición de instituciones, roles de cualquier persona, funciones habilitadas, aviso global |
+
+La **Administración general** se otorga solo por Secrets (`SIA_SUPERADMINS = "dni1,dni2"`), nunca desde la app.
+
+**Sesiones persistentes:** al ingresar se guarda una cookie con un token aleatorio (en la base solo se guarda su
+hash SHA-256). Recargar la página no cierra la sesión; expira tras `SIA_SESSION_MINUTES` sin actividad
+(30 por defecto) o 12 horas como máximo, y cambiar la contraseña cierra todas las sesiones abiertas.
 
 ## Documentación
 
@@ -20,23 +41,23 @@ Los PDF se regeneran con `python docs/generar_pdfs.py` (requiere `pip install ma
 ## Estructura
 
 ```
-app.py              punto de entrada: página, sesión y ruteo por rol
+app.py              punto de entrada: página, sesión persistente y ruteo por perfil
 core/               base de datos, seguridad, validaciones, fechas, reportes PDF/Excel, Google Drive
-models/             Persona/Docente/Estudiante, Materia, RegistroAsistencia, PredictorRiesgoIA
+models/             Persona (y roles), Institucion, Materia, RegistroAsistencia, Justificativo, PredictorRiesgoIA
 utils/qr.py         generación y lectura de códigos QR
-views/              paneles, escáner QR en vivo, exportaciones, PWA y estilos
+views/              paneles por rol, configuración institucional, gráficos, escáner QR, PWA y estilos
 scripts/            autorización de Google Drive (se ejecuta una vez)
 docs/               informes del sistema (.md y .pdf)
 ```
 
 ## Identidad visual
 
-- **Paleta:** `#B78FB6` (lila, acentos), `#7979B1` (lavanda, secundarios/hover), `#346FB0` (azul, botones y bordes),
-  `#02447B` (tarjetas en oscuro) y `#003467` (fondo en oscuro).
-- **Tipografía:** Plus Jakarta Sans (con Inter y Nunito de respaldo), cargada desde Google Fonts.
-- **Pestañas tipo píldora**, tarjetas con bordes de 18 px y botones redondeados con sombras suaves.
-- **Logos:** `assets/logo_ies.png` (encabezado y barra lateral) y `assets/logo_tech.png` (pie de página). Ver `assets/LEEME.md`.
-- **Modo claro / oscuro:** interruptor "🌙 Modo oscuro" en la barra lateral.
+- Diseño sobrio y corporativo: tipografía Inter, superficies planas, bordes finos, sin gradientes.
+- El color principal y el logo vienen de la institución activa (los configura Dirección o la Administración
+  general, con control de contraste). En modo oscuro el acento se aclara automáticamente hasta 4.5:1.
+- Gráficos: una serie usa el color institucional; varias series, una paleta categórica fija; los estados
+  (bueno / advertencia / crítico) siempre llevan texto, y los umbrales se dibujan como línea rotulada.
+- **Modo claro / oscuro:** interruptor en la barra lateral.
 
 ## Instalación en el celular (PWA)
 
@@ -47,7 +68,7 @@ Requiere `server.enableStaticServing = true` en `.streamlit/config.toml` (ya con
 ## Materias
 
 Cada materia se carga con selectores: **Curso** (1° a 4° Año), **Comisión**, **Turno** (Mañana / Tarde / Noche),
-**Días de cursada** y horario **Desde / Hasta**, más una descripción opcional y el **programa en PDF** (hasta 8 MB),
+**Días de cursada**, horario **Desde / Hasta** (cada 10 minutos), **carrera** y umbrales de regularidad y promoción, más una descripción opcional y el **programa en PDF** (hasta 8 MB),
 que los alumnos inscriptos pueden descargar. Las bases de versiones anteriores se migran solas al iniciar.
 
 ## Escáner QR en vivo

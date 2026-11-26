@@ -1,6 +1,7 @@
-"""SIA Python Edition (Instituto de Educación Superior N° 11) — punto de entrada de Streamlit.
+"""SIA · Sistema de Asistencia Inteligente (SaaS multi-institución) — punto de entrada de Streamlit.
 
 Ejecutar:  streamlit run app.py
+Enlace por institución:  https://<app>/?i=<identificador>   (ej. ?i=ies11)
 """
 from __future__ import annotations
 
@@ -18,10 +19,9 @@ _PAQUETES_PROPIOS = ("core", "models", "utils", "views")
 def _descartar_modulos_desactualizados() -> None:
     """Fuerza a reimportar los módulos del proyecto cuando su código cambió.
 
-    Al actualizar el repositorio, Streamlit Cloud vuelve a ejecutar app.py pero puede conservar en memoria
-    las versiones anteriores de views/, models/, etc. Si app.py nuevo pide un nombre que el módulo viejo no
-    tiene, aparece un ImportError (p. ej. `cannot import name 'TITULO_APP'`). Comparamos la fecha de
-    modificación de los .py con la registrada en la ejecución anterior y, si cambió, los descartamos.
+    Al actualizar el repositorio, Streamlit Cloud vuelve a ejecutar app.py pero puede conservar en memoria las
+    versiones anteriores de views/, models/, etc.; si el app.py nuevo pide un nombre que el módulo viejo no
+    tiene, aparece un ImportError. Si cambió la fecha de modificación de algún .py, se descartan.
     """
     archivos = [p for paquete in _PAQUETES_PROPIOS for p in (_RAIZ / paquete).rglob("*.py")]
     firma = tuple(sorted((str(p), p.stat().st_mtime_ns) for p in archivos if p.exists()))
@@ -35,24 +35,23 @@ def _descartar_modulos_desactualizados() -> None:
 
 _descartar_modulos_desactualizados()
 
-try:
-    from views.styles import TITULO_APP
-except ImportError:  # respaldo: la app arranca aunque el módulo de estilos esté desactualizado
-    TITULO_APP = "SIA · IES N° 11"
-
 st.set_page_config(
-    page_title=f"{TITULO_APP} · Asistencia Inteligente",
-    page_icon=str(_RAIZ / "static" / "icon-192.png") if (_RAIZ / "static" / "icon-192.png").exists() else "🎓",
+    page_title="SIA · Sistema de Asistencia Inteligente",
+    page_icon=str(_RAIZ / "static" / "icon-192.png") if (_RAIZ / "static" / "icon-192.png").exists() else None,
     layout="wide",
     initial_sidebar_state="auto",
 )
 
 from core.database import init_db  # noqa: E402
 from models.asistencia import RegistroAsistencia  # noqa: E402
+from models.institucion import NOMBRES_ROL, mensaje_sistema  # noqa: E402
 from models.materia import Materia  # noqa: E402
-from views import alumno, auth, docente  # noqa: E402
+from views import alumno, auth, directivo, docente, preceptor, superadmin  # noqa: E402
 from views.pwa import inyectar_pwa  # noqa: E402
-from views.styles import badge, footer, inyectar_css, marca_sidebar, selector_tema  # noqa: E402
+from views.styles import footer, inyectar_css, marca_sidebar, selector_tema  # noqa: E402
+
+PANELES = {"estudiante": alumno, "docente": docente, "preceptor": preceptor, "directivo": directivo,
+           "superadmin": superadmin}
 
 
 @st.cache_resource(show_spinner=False)
@@ -64,8 +63,8 @@ def _inicializar_db() -> bool:
 def _capturar_enlace_qr() -> None:
     """QR escaneado con la cámara nativa del celular: abre la app con ?asistencia= o ?inscribir=.
 
-    El token de asistencia se valida AHORA (al abrir el enlace), así el alumno puede iniciar
-    sesión con calma sin que expire la ventana de 30 s del QR dinámico.
+    El token de asistencia se valida AHORA (al abrir el enlace), así el alumno puede iniciar sesión con calma
+    sin que expire la ventana de 30 s del QR dinámico.
     """
     parametros = st.query_params
     if "asistencia" in parametros:
@@ -82,52 +81,59 @@ def _capturar_enlace_qr() -> None:
         return
     accion["capturado"] = time.time()
     st.session_state["accion_pendiente"] = accion
-    st.query_params.clear()
+    for clave in ("asistencia", "inscribir", "f"):
+        if clave in st.query_params:
+            del st.query_params[clave]
 
 
-def _sidebar(persona) -> None:
+def _barra_lateral(persona) -> None:
     with st.sidebar:
-        st.markdown(
-            f'<div class="sia-card"><b>{escape(persona.nombre_completo)}</b><br>'
-            f'<span class="sia-muted">DNI {escape(persona.dni)}</span><br><br>'
-            f'{badge(persona.rol.capitalize(), "azul" if persona.rol == "docente" else "celeste")}</div>',
-            unsafe_allow_html=True,
-        )
+        marca_sidebar()
+        rol = st.session_state["usuario_rol"]
+        st.markdown(f'<div class="sia-usuario"><b>{escape(persona.nombre_completo)}</b>'
+                    f'<span>{escape(NOMBRES_ROL[rol])} · DNI {escape(persona.dni)}</span></div>', unsafe_allow_html=True)
+        perfiles = [((i.id if i else None), r) for i, r in auth.perfiles_disponibles(persona)]
+        actual = (st.session_state.get("institucion_id"), rol)
+        if len(perfiles) > 1 and actual in perfiles:
+            elegido = st.selectbox("Perfil", perfiles, index=perfiles.index(actual),
+                                   format_func=lambda p: auth.etiqueta_perfil(*p), key="selector_perfil")
+            if elegido != actual:
+                auth.cambiar_perfil(*elegido)
+                st.rerun()
+        selector_tema()
 
 
-def _sidebar_pie(persona) -> None:
+def _pie_barra_lateral(persona) -> None:
     with st.sidebar:
         st.divider()
         auth.render_cambio_password(persona)
-        if st.button("🚪 Cerrar sesión", width="stretch"):
+        if st.button("Cerrar sesión", width="stretch", key="btn_cerrar_sesion"):
             auth.cerrar_sesion("Cerraste sesión correctamente.")
             st.rerun()
-        st.caption(f"La sesión expira tras {auth.MINUTOS_INACTIVIDAD} min de inactividad.")
-        st.caption("**Tech & Innovation Team** — IES N° 11")
+        st.caption(f"La sesión se cierra tras {auth.MINUTOS_INACTIVIDAD} min sin actividad. "
+                   "Recargar la página no la cierra.")
 
 
 def main() -> None:
     _inicializar_db()
     _capturar_enlace_qr()
-    inyectar_css()
-    inyectar_pwa()  # al inicio: oculta los flotantes de Streamlit Cloud aunque una vista falle más abajo
-    with st.sidebar:
-        marca_sidebar()
-        selector_tema()
-
     persona = auth.usuario_actual()
     if persona is None:
-        auth.render_acceso()
+        auth.render_acceso()  # aplica la identidad de la institución elegida
     else:
-        _sidebar(persona)
-        if persona.rol == "docente":
-            if st.session_state.pop("accion_pendiente", None):
-                st.warning("📲 Abriste un QR pensado para estudiantes. Para usarlo, ingresá con una cuenta de estudiante.")
-            docente.render(persona)
-        else:
-            alumno.render(persona)
-        _sidebar_pie(persona)
+        inyectar_css()
+        _barra_lateral(persona)
+        aviso = mensaje_sistema()
+        if aviso:
+            st.info(aviso)
+        rol = st.session_state["usuario_rol"]
+        if rol != "estudiante" and st.session_state.pop("accion_pendiente", None):
+            st.warning("Abriste un QR pensado para estudiantes. Para usarlo, ingresá con un perfil de estudiante.")
+        PANELES[rol].render(persona)
+        _pie_barra_lateral(persona)
     footer()
+    auth.sincronizar_cookies()
+    inyectar_pwa()
 
 
 main()

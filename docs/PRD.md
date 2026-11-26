@@ -41,19 +41,25 @@ SIA registra la asistencia de las clases del IES N° 11 con códigos QR firmados
 | ID | Requisito |
 |---|---|
 | RF-01 | Registro de estudiantes y docentes con validación de nombre, apellido, DNI, email y contraseña (mínimo 8 caracteres con letras y números). |
-| RF-02 | El alta docente puede exigir un código institucional (`SIA_DOCENTE_CODE`). |
+| RF-02 | El alta docente puede exigir un código institucional (definido por cada institución, o `SIA_DOCENTE_CODE` por defecto). |
 | RF-03 | Inicio de sesión con DNI o email; bloqueo de 15 minutos tras 5 intentos fallidos. |
-| RF-04 | La sesión expira tras 30 minutos sin actividad y a las 8 horas como máximo. |
+| RF-04 | La sesión sobrevive a recargar la página (cookie con token aleatorio; en la base solo su hash). Expira tras 30 minutos sin actividad y a las 12 horas como máximo; cambiar la contraseña cierra todas las sesiones. |
+| RF-05 | Multi-institución: una cuenta por persona (DNI) con roles por institución (estudiante, docente, preceptoría, dirección). Acceso por enlace `?i=identificador` y selector en el login; cambio de perfil sin volver a ingresar. |
+| RF-06 | Marca blanca: nombre, logo y colores por institución, aplicados al login, encabezados, botones, gráficos y reportes PDF. |
+| RF-07 | La Administración general se otorga solo por Secrets (`SIA_SUPERADMINS`): alta y suspensión de instituciones, roles de cualquier persona, funciones habilitadas y aviso global. |
 
 ### 5.2 Materias
 
 | ID | Requisito |
 |---|---|
-| RF-10 | Crear y editar materias con nombre, curso, comisión, turno, días, horario de inicio y fin, umbral de regularidad y descripción opcional. Curso, comisión, turno, días y horarios se eligen de listas (no hay texto libre). |
+| RF-10 | Crear y editar materias con nombre, curso, comisión, turno, días, horario de inicio y fin (intervalos de 10 minutos), carrera, umbrales de regularidad y de promoción y descripción opcional. Curso, comisión, turno, días y horarios se eligen de listas (no hay texto libre). |
 | RF-11 | Adjuntar, reemplazar o quitar el programa de la materia en PDF (máximo 8 MB, se verifica que sea un PDF real). Los estudiantes inscriptos lo pueden descargar. |
 | RF-12 | Código de inscripción `SIA-XXXXXX` y QR firmado; el docente puede regenerarlo para invalidar el anterior. |
 | RF-13 | Cargar el resultado final de cada alumno (aprobado, reprobado, abandono); alimenta el modelo de IA. |
 | RF-14 | Archivar materias y dar de baja alumnos. |
+
+| RF-15 | Carreras por institución; cada docente tiene carreras asignadas por Dirección y filtra sus materias por carrera. |
+| RF-16 | Condición académica por materia: Promociona (≥ umbral de promoción), Regular (≥ umbral de regularidad) o Libre. Los umbrales por defecto los define Dirección y se pueden aplicar a todas las materias. |
 
 ### 5.3 Asistencia
 
@@ -69,6 +75,10 @@ SIA registra la asistencia de las clases del IES N° 11 con códigos QR firmados
 | RF-27 | Registro manual con estado presente, tarde o justificado; corrección y anulación. |
 | RF-28 | Al cerrar la clase se genera automáticamente un reporte PDF para Preceptoría, descargable y enviable a Google Drive; queda guardado y se puede volver a descargar desde el historial de clases. |
 
+| RF-25 | Llegada tarde automática: un presente por QR o PIN posterior al inicio de la materia más la tolerancia institucional (múltiplos de 10 minutos) se registra como «tarde». |
+| RF-26 | Preceptoría registra asistencia manual por materia y fecha (alumnos sin dispositivo o sin conexión), incluso en clases cerradas o pasadas; vincula alumnos por DNI y crea cuentas con contraseña temporal. |
+| RF-27 | Justificativos: el alumno los presenta con comprobante opcional; Preceptoría o el docente los aprueban o rechazan en lote. Aprobar marca como «justificado» las ausencias del período (nunca pisa un presente). Preceptoría puede justificar en forma masiva (jornada institucional, paro, etc.). |
+
 ### 5.4 Historial, alertas y reportes
 
 | ID | Requisito |
@@ -78,6 +88,15 @@ SIA registra la asistencia de las clases del IES N° 11 con códigos QR firmados
 | RF-32 | Alerta de riesgo automática en ambos paneles: banner rojo cuando un alumno queda bajo el umbral, acumula 3 o más faltas consecutivas o el modelo estima una probabilidad de riesgo de 60 % o más; aviso ámbar al estudiante cuando lleva 2 o más faltas seguidas. |
 | RF-33 | El estudiante ve cuántas clases seguidas necesita para recuperar la regularidad. |
 | RF-34 | Exportación del historial a CSV y Excel (hojas Registros, Historial y Riesgo) y envío a una carpeta institucional de Google Drive. |
+
+### 5.5 Rectoría / Dirección
+
+| ID | Requisito |
+|---|---|
+| RF-40 | Resumen ejecutivo por período: asistencia promedio, porcentaje de cursadas que promocionan, regulares y libres, alumnos en riesgo alto. |
+| RF-41 | Gráficos de asistencia por carrera, condición por carrera, tendencia semanal y materias con menor asistencia; tabla por materia y de alumnos en riesgo. |
+| RF-42 | Reporte institucional en Excel/CSV (y Google Drive). |
+| RF-43 | Gestión de carreras, asignación de carreras a docentes, alta de personal por DNI y configuración de umbrales, tolerancia e identidad visual. |
 
 ## 6. Inteligencia artificial
 

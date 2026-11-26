@@ -13,7 +13,14 @@ import argparse
 import getpass
 import sys
 
-from core.database import DB_PATH, TABLAS, get_connection, init_db, leer_config, tablas_existentes
+from core.database import (
+    DB_PATH,
+    TABLAS,
+    get_connection,
+    init_db,
+    leer_config,
+    tablas_existentes,
+)
 
 
 def verificar() -> bool:
@@ -50,6 +57,12 @@ def crear_docente() -> None:
     except ValueError as exc:
         print(f"Error: {exc}")
         sys.exit(1)
+    from models.institucion import Institucion, asignar_rol
+
+    instituciones = Institucion.todas()
+    if instituciones:
+        asignar_rol(docente.id, instituciones[0].id, "docente")
+        print(f"Rol docente asignado en {instituciones[0].nombre}.")
     print(f"Docente creado: {docente!r}")
 
 
