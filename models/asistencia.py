@@ -78,6 +78,11 @@ class RegistroAsistencia:
         w = _ventana()
         return any(hmac.compare_digest(self.generar_pin(ventana=v), pin) for v in (w, w - 1))
 
+    def codigos_proyeccion(self) -> tuple[str, str, int]:
+        """QR, PIN y segundos restantes calculados a partir del mismo instante."""
+        instante = time.time()
+        return self.generar_token(instante), self.generar_pin(instante), segundos_restantes(instante)
+
     # ----- marcado (núcleo idempotente) -----
     def marcar(
         self,
@@ -205,7 +210,8 @@ class RegistroAsistencia:
             return None, "QR de clase mal formado."
         if not security.verificar_firma(f"SIA:C:{clase_id}:{ventana}", partes[4], 12):
             return None, "QR de clase adulterado."
-        if ventana not in (_ventana(), _ventana() - 1):
+        actual = _ventana()
+        if ventana not in (actual, actual - 1):
             return None, "El QR expiró. Escaneá el código que se proyecta ahora."
         return clase_id, None
 

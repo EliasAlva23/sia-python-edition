@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from contextlib import nullcontext
 from dataclasses import dataclass
 
 import pandas as pd
@@ -187,23 +188,64 @@ class Institucion:
                          (nombre, int(activa), carrera_id, self.id))
 
     def carreras_de_docente(self, usuario_id: int) -> list[tuple[int, str]]:
+        return self._carreras_asignadas(usuario_id, "docente")
+
+    def carreras_de_preceptor(self, usuario_id: int) -> list[tuple[int, str]]:
+        return self._carreras_asignadas(usuario_id, "preceptor")
+
+    def _carreras_asignadas(self, usuario_id: int, rol: str) -> list[tuple[int, str]]:
         with get_connection() as conn:
             filas = conn.execute(
-                """SELECT c.id, c.nombre FROM carreras c JOIN docente_carreras dc ON dc.carrera_id = c.id
+                f"""SELECT c.id, c.nombre FROM carreras c JOIN {rol}_carreras dc ON dc.carrera_id = c.id
                    WHERE dc.usuario_id = ? AND c.institucion_id = ? AND c.activa = 1 ORDER BY c.nombre""",
                 (usuario_id, self.id),
             ).fetchall()
         return [(f["id"], f["nombre"]) for f in filas]
 
-    def asignar_carreras(self, usuario_id: int, carrera_ids: list[int]) -> None:
+    def asignar_carreras(self, usuario_id: int, carrera_ids: list[int], *, preceptor_id: int | None = None) -> None:
         """Reemplaza las carreras asignadas a un docente dentro de esta institución."""
+        self._asignar_carreras(usuario_id, carrera_ids, "docente", preceptor_id=preceptor_id)
+
+    def asignar_carreras_preceptor(self, usuario_id: int, carrera_ids: list[int]) -> None:
+        self._asignar_carreras(usuario_id, carrera_ids, "preceptor")
+
+    def _asignar_carreras(self, usuario_id: int, carrera_ids: list[int], rol: str, *,
+                         preceptor_id: int | None = None) -> None:
         with get_connection() as conn:
-            conn.execute(
-                """DELETE FROM docente_carreras WHERE usuario_id = ?
-                   AND carrera_id IN (SELECT id FROM carreras WHERE institucion_id = ?)""",
-                (usuario_id, self.id),
-            )
-            conn.executemany("INSERT OR IGNORE INTO docente_carreras (usuario_id, carrera_id) VALUES (?, ?)",
+            conn.execute("BEGIN IMMEDIATE")
+            membresia = conn.execute(
+                "SELECT 1 FROM membresias WHERE usuario_id = ? AND institucion_id = ? AND rol = ?",
+                (usuario_id, self.id, rol),
+            ).fetchone()
+            activas = {f["id"] for f in conn.execute(
+                "SELECT id FROM carreras WHERE institucion_id = ? AND activa = 1", (self.id,),
+            )}
+            disponibles = activas
+            if preceptor_id is not None:
+                if not conn.execute(
+                    "SELECT 1 FROM membresias WHERE usuario_id = ? AND institucion_id = ? AND rol = 'preceptor'",
+                    (preceptor_id, self.id),
+                ).fetchone():
+                    raise ValueError("La asignación operativa corresponde a Preceptoría.")
+                asignadas = {f["carrera_id"] for f in conn.execute(
+                    """SELECT pc.carrera_id FROM preceptor_carreras pc JOIN carreras c ON c.id = pc.carrera_id
+                       WHERE pc.usuario_id = ? AND c.institucion_id = ? AND c.activa = 1""",
+                    (preceptor_id, self.id),
+                )}
+                if asignadas:
+                    disponibles = asignadas
+            if not membresia or not set(carrera_ids) <= disponibles:
+                raise ValueError("Elegí una persona con ese rol y carreras activas de la institución.")
+            if preceptor_id is None:
+                conn.execute(
+                    f"""DELETE FROM {rol}_carreras WHERE usuario_id = ?
+                       AND carrera_id IN (SELECT id FROM carreras WHERE institucion_id = ?)""",
+                    (usuario_id, self.id),
+                )
+            else:
+                conn.executemany("DELETE FROM docente_carreras WHERE usuario_id = ? AND carrera_id = ?",
+                                 [(usuario_id, c) for c in disponibles])
+            conn.executemany(f"INSERT OR IGNORE INTO {rol}_carreras (usuario_id, carrera_id) VALUES (?, ?)",
                              [(usuario_id, c) for c in carrera_ids])
 
     # ----- personas y roles -----
@@ -243,11 +285,11 @@ def tiene_rol(usuario_id: int, institucion_id: int, rol: str) -> bool:
         ).fetchone() is not None
 
 
-def asignar_rol(usuario_id: int, institucion_id: int, rol: str) -> bool:
+def asignar_rol(usuario_id: int, institucion_id: int, rol: str, *, conn: sqlite3.Connection | None = None) -> bool:
     if rol not in ROLES:
         raise ValueError("Rol inválido.")
-    with get_connection() as conn:
-        cur = conn.execute(
+    with nullcontext(conn) if conn is not None else get_connection() as conexion:
+        cur = conexion.execute(
             "INSERT OR IGNORE INTO membresias (usuario_id, institucion_id, rol, creado_en) VALUES (?, ?, ?, ?)",
             (usuario_id, institucion_id, rol, ahora_iso()),
         )
@@ -256,6 +298,12 @@ def asignar_rol(usuario_id: int, institucion_id: int, rol: str) -> bool:
 
 def quitar_rol(usuario_id: int, institucion_id: int, rol: str) -> None:
     with get_connection() as conn:
+        if rol == "preceptor":
+            conn.execute(
+                """DELETE FROM preceptor_carreras WHERE usuario_id = ?
+                   AND carrera_id IN (SELECT id FROM carreras WHERE institucion_id = ?)""",
+                (usuario_id, institucion_id),
+            )
         conn.execute("DELETE FROM membresias WHERE usuario_id = ? AND institucion_id = ? AND rol = ?",
                      (usuario_id, institucion_id, rol))
         conn.execute("DELETE FROM sesiones WHERE usuario_id = ? AND institucion_id = ? AND rol = ?",

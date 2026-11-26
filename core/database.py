@@ -18,13 +18,13 @@ from typing import Iterator
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = Path(os.environ.get("SIA_DB_PATH", BASE_DIR / "database.db"))
-SCHEMA_VERSION = "5"
+SCHEMA_VERSION = "6"
 ROLES = ("estudiante", "docente", "preceptor", "directivo")
 
 TABLAS = (
     "config", "instituciones", "carreras", "usuarios", "membresias", "docente_carreras", "materias",
     "inscripciones", "clases", "asistencias", "justificativos", "sesiones", "intentos_login",
-    "materia_programas", "clase_reportes", "invitaciones",
+    "materia_programas", "clase_reportes", "invitaciones", "preceptor_carreras", "asistencia_docente",
 )
 
 # Definiciones de las tablas que cambiaron su CHECK (se reconstruyen en bases existentes).
@@ -104,6 +104,23 @@ CREATE TABLE IF NOT EXISTS docente_carreras (
     usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
     carrera_id INTEGER NOT NULL REFERENCES carreras(id) ON DELETE CASCADE,
     PRIMARY KEY (usuario_id, carrera_id)
+);
+
+CREATE TABLE IF NOT EXISTS preceptor_carreras (
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    carrera_id INTEGER NOT NULL REFERENCES carreras(id) ON DELETE CASCADE,
+    PRIMARY KEY (usuario_id, carrera_id)
+);
+
+CREATE TABLE IF NOT EXISTS asistencia_docente (
+    id INTEGER PRIMARY KEY,
+    institucion_id INTEGER NOT NULL REFERENCES instituciones(id) ON DELETE CASCADE,
+    docente_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    materia_id INTEGER REFERENCES materias(id) ON DELETE CASCADE,
+    fecha TEXT NOT NULL,
+    estado TEXT NOT NULL CHECK (estado IN ('presente', 'tarde', 'justificado', 'ausente')),
+    registrado_por INTEGER NOT NULL REFERENCES usuarios(id),
+    registrado_en TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS materias (
@@ -223,12 +240,17 @@ CREATE INDEX IF NOT EXISTS idx_login            ON intentos_login(identificador,
 CREATE INDEX IF NOT EXISTS idx_materias_inst    ON materias(institucion_id, activa);
 CREATE INDEX IF NOT EXISTS idx_membresias_inst  ON membresias(institucion_id, rol);
 CREATE INDEX IF NOT EXISTS idx_justif_inst      ON justificativos(institucion_id, estado);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_asistencia_docente
+    ON asistencia_docente(institucion_id, docente_id, fecha, COALESCE(materia_id, 0));
 CREATE INDEX IF NOT EXISTS idx_sesiones_usuario ON sesiones(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_invitaciones_usr ON invitaciones(usuario_id, institucion_id);
 """
 
 # Columnas agregadas en versiones posteriores: se crean en bases existentes sin perder datos.
 _MIGRACIONES = {
+    "justificativos": {
+        "rol": "TEXT NOT NULL DEFAULT 'estudiante' CHECK (rol IN ('estudiante', 'docente'))",
+    },
     "usuarios": {
         "debe_cambiar_password": "INTEGER NOT NULL DEFAULT 0",
     },
@@ -359,7 +381,7 @@ def init_db() -> None:
 
 
 _LOCK_ESQUEMA = threading.Lock()
-_TABLAS_CLAVE = ("instituciones", "membresias", "sesiones", "config")
+_TABLAS_CLAVE = ("instituciones", "membresias", "sesiones", "config", "preceptor_carreras", "asistencia_docente")
 
 
 def esquema_al_dia() -> bool:

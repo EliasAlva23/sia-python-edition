@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+import pytest
 from conftest import crear_materia
 
 from core import sesiones
@@ -25,6 +26,18 @@ def test_alta_docente_genera_usuario_clave_temporal_e_invitacion(institucion):
     persona, _ = RepositorioPersonas.autenticar("30111222", alta.clave_temporal)
     assert persona is not None and persona.id == alta.persona.id
     assert RepositorioPersonas.debe_cambiar_password(alta.persona.id)
+
+
+def test_alta_se_puede_reintentar_si_falla_la_invitacion(institucion, monkeypatch):
+    with monkeypatch.context() as parche:
+        def falla(*args, **kwargs):
+            raise RuntimeError("Error al guardar la invitación")
+
+        parche.setattr(cuentas, "crear_invitacion", falla)
+        with pytest.raises(RuntimeError, match="invitar|invitación"):
+            _alta_docente(institucion)
+    assert RepositorioPersonas.por_dni("30111222") is None
+    assert _alta_docente(institucion).invitacion
 
 
 def test_clave_temporal_cumple_politica_y_es_distinta():

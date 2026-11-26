@@ -16,6 +16,8 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
+import sqlite3
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -67,18 +69,18 @@ def crear_o_asignar(institucion_id: int, rol: str, dni: str, nombre: str = "", a
     """
     if rol not in CLASES_POR_ROL:
         raise ValueError("Rol inválido.")
-    persona = RepositorioPersonas.por_dni(dni)
-    temporal = None
-    if persona is None:
-        temporal = generar_clave_temporal()
-        persona = CLASES_POR_ROL[rol](dni, nombre, apellido, email)
-        persona.establecer_password(temporal)
-        RepositorioPersonas.registrar(persona)
-        RepositorioPersonas.marcar_cambio_obligatorio(persona.id)
-    nuevo = asignar_rol(persona.id, institucion_id, rol)
-    invitacion = None
-    if temporal and con_invitacion:
-        invitacion = crear_invitacion(persona.id, institucion_id, rol, creado_por)
+    with get_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        persona = RepositorioPersonas.por_dni(dni)
+        temporal = invitacion = None
+        if persona is None:
+            temporal = generar_clave_temporal()
+            persona = CLASES_POR_ROL[rol](dni, nombre, apellido, email)
+            persona.establecer_password(temporal)
+            RepositorioPersonas.registrar(persona, conn=conn, temporal=True)
+        nuevo = asignar_rol(persona.id, institucion_id, rol, conn=conn)
+        if temporal and con_invitacion:
+            invitacion = crear_invitacion(persona.id, institucion_id, rol, creado_por, conn=conn)
     return AltaCuenta(persona, temporal, invitacion, nuevo)
 
 
@@ -94,13 +96,13 @@ def registrar_estudiante(institucion_id: int, dni: str, nombre: str, apellido: s
 
 # ---------------------------------------------------------------- invitaciones (QR de un solo uso)
 def crear_invitacion(usuario_id: int, institucion_id: int, rol: str, creado_por: int | None = None,
-                     horas: int = HORAS_INVITACION) -> str:
+                     horas: int = HORAS_INVITACION, *, conn: sqlite3.Connection | None = None) -> str:
     """Genera un token nuevo e invalida las invitaciones anteriores de esa persona en la institución."""
     token = secrets.token_urlsafe(24)
     momento = ahora()
-    with get_connection() as conn:
-        conn.execute("DELETE FROM invitaciones WHERE usuario_id = ? AND institucion_id = ?", (usuario_id, institucion_id))
-        conn.execute(
+    with nullcontext(conn) if conn is not None else get_connection() as conexion:
+        conexion.execute("DELETE FROM invitaciones WHERE usuario_id = ? AND institucion_id = ?", (usuario_id, institucion_id))
+        conexion.execute(
             """INSERT INTO invitaciones (token_hash, usuario_id, institucion_id, rol, creado_por, creado_en, expira_en)
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (_hash(token), usuario_id, institucion_id, rol, creado_por, momento.isoformat(),
@@ -233,7 +235,7 @@ def asegurar_superadmin(dni: str, clave: str) -> Persona | None:
 
 
 def momento_legible(iso: str | None) -> str | None:
-    if not iso:
+    if not isinstance(iso, str) or not iso:
         return None
     try:
         return datetime.fromisoformat(iso).strftime("%d/%m %H:%M")

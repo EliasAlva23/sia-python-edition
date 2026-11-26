@@ -197,17 +197,17 @@ def _variables() -> str:
   --border-fuerte: #3B4F6C; --ink: #EEF0EC; --ink-2: #D3D9E0; --muted: #A9B3C2; --track: #24354E;
   --primary: {acento}; --primary-ink: {tinta_sobre(acento)}; --primary-soft: {mezclar(acento, SUPERFICIE_OSCURA, 0.8)};
   --primary-hover: {mezclar(acento, '#FFFFFF', 0.12)}; --secondary: {_aclarar_para_oscuro(secundario)};
-  --marca: {fondo_marca(primario)}; --grid: #26364F; --oliva: #A3B35A;
+  --marca: {fondo_marca(primario)}; --grid: #26364F; --oliva: #A3B35A; --tinte-fondo: 12%;
   --sombra: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 8px 24px -16px rgba(0, 0, 0, .6);
   --sombra-alta: 0 1px 0 rgba(255, 255, 255, .05) inset, 0 18px 34px -18px rgba(0, 0, 0, .8);
   --boton-a: {mezclar(_aclarar_para_oscuro(secundario), SUPERFICIE_OSCURA, 0.35)}; --boton-b: {mezclar(acento, SUPERFICIE_OSCURA, 0.3)};
 """
     return f"""
-  --bg: #E7ECE5; --surface: #F0F3EC; --surface-2: #E1E8DF; --campo: #F6F8F2; --border: #C9D2C4;
-  --border-fuerte: #A9B4A4; --ink: {MARINO}; --ink-2: #26344A; --muted: #4A5566; --track: #D5DDD1;
+  --bg: #DCE7E1; --surface: #E6EBE1; --surface-2: #D5E2DC; --campo: #EEF0EC; --border: #ACBEB5;
+  --border-fuerte: #869D92; --ink: {MARINO}; --ink-2: #26344A; --muted: #405365; --track: #B7CAC1;
   --primary: {primario}; --primary-ink: {tinta_sobre(primario)}; --primary-soft: {mezclar(primario, '#FFFFFF', 0.9)};
   --primary-hover: {mezclar(primario, MARINO, 0.25)}; --secondary: {secundario};
-  --marca: {fondo_marca(primario)}; --grid: #D3DACE; --oliva: {OLIVA};
+  --marca: {fondo_marca(primario)}; --grid: #BCD0C6; --oliva: {OLIVA}; --tinte-fondo: 25%;
   --sombra: 0 1px 2px rgba(20, 32, 51, .06), 0 10px 24px -18px rgba(20, 32, 51, .35);
   --sombra-alta: 0 2px 4px rgba(20, 32, 51, .07), 0 18px 32px -20px rgba(20, 32, 51, .5);
   --boton-a: {mezclar(secundario, MARINO, 0.12)}; --boton-b: {mezclar(primario, MARINO, 0.1)};
@@ -234,8 +234,8 @@ html, body, .stApp, .stApp p, .stApp li, .stApp label, .stApp input, .stApp text
 
 /* Base */
 .stApp, [data-testid="stAppViewContainer"] {{ color: var(--ink); background:
-    radial-gradient(1100px 560px at 108% -12%, color-mix(in srgb, var(--secondary) 12%, transparent), transparent 62%),
-    radial-gradient(900px 520px at -12% 112%, color-mix(in srgb, var(--oliva) 11%, transparent), transparent 60%),
+    radial-gradient(1100px 620px at 105% 0%, color-mix(in srgb, var(--secondary) var(--tinte-fondo), transparent), transparent 78%),
+    radial-gradient(900px 590px at 0% 110%, color-mix(in srgb, var(--oliva) var(--tinte-fondo), transparent), transparent 75%),
     var(--bg) !important; background-attachment: fixed !important; }}
 .block-container {{ padding-top: 1.2rem; padding-bottom: 2.5rem; max-width: 1280px; }}
 section[data-testid="stSidebar"] {{ border-right: 1px solid var(--border-fuerte);
@@ -487,11 +487,20 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover, [data-testid="stExpander"
 .sia-grid .sia-card {{ margin-bottom: 0; }}
 /* Indicadores circulares: anillo proporcional al dato, valor al centro, etiqueta y contexto debajo */
 .sia-kpi {{ display: flex; flex-direction: column; align-items: center; text-align: center; gap: .55rem; padding: 1.1rem .9rem 1rem;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 8%, var(--surface)) 0%, var(--surface) 62%) !important; }}
-.sia-anillo {{ position: relative; width: var(--d, 112px); aspect-ratio: 1; flex: 0 0 auto; }}
-.sia-anillo svg {{ width: 100%; height: 100%; display: block; transform: rotate(-90deg); }}
-.sia-anillo .pista {{ stroke: var(--track); }}
-.sia-anillo .arco {{ stroke: var(--tono, var(--primary)); stroke-linecap: round; }}
+  --acento-tarjeta: var(--primary);
+  background: linear-gradient(155deg, color-mix(in srgb, var(--acento-tarjeta) 18%, var(--surface)), var(--surface) 76%) !important; }}
+.sia-grid > .sia-kpi:nth-child(3n+2) {{ --acento-tarjeta: var(--secondary); }}
+.sia-grid > .sia-kpi:nth-child(3n) {{ --acento-tarjeta: var(--oliva); }}
+.sia-anillo {{ position: relative; width: var(--d, 112px); aspect-ratio: 1; flex: 0 0 auto;
+  --arco: var(--tono, var(--acento-tarjeta, var(--primary)));
+  transition: transform .2s ease; }}
+.sia-anillo::before {{ content: ""; position: absolute; inset: 5%; border-radius: 50%;
+  background: conic-gradient(var(--arco) var(--progreso), color-mix(in srgb, var(--arco) 24%, var(--track)) 0);
+  mask-image: radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 7px)); }}
+.sia-anillo.sin-datos {{ --arco: color-mix(in srgb, var(--acento-tarjeta, var(--primary)) 70%, var(--surface)); }}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {{
+  .sia-kpi:hover .sia-anillo {{ transform: scale(1.04); }}
+}}
 .sia-anillo .centro {{ position: absolute; inset: 14%; border-radius: 50%; display: flex; flex-direction: column;
   align-items: center; justify-content: center; line-height: 1.1; }}
 .sia-kpi .value {{ font-size: var(--fs, 1.45rem); font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums;
@@ -763,20 +772,16 @@ def _pct_de(valor) -> float | None:
 
 
 def anillo_html(valor, pct: float | None, color: str | None = None, diametro: int | None = None) -> str:
-    """Anillo SVG: el arco cubre `pct` % de la circunferencia; sin pct, se muestra el círculo completo en tono suave."""
+    """Dibuja la proporción o un anillo institucional para valores sin denominador."""
     texto = str(valor)
     fs = 1.45 if len(texto) <= 4 else 1.2 if len(texto) <= 6 else 1.0 if len(texto) <= 8 else .85
-    estilo = f"--fs:{fs}rem;" + (f"--tono:{color};" if color else "") + (f"--d:{diametro}px;" if diametro else "")
-    if pct is None:
-        arco = '<circle class="arco" cx="50" cy="50" r="43" fill="none" stroke-width="7" stroke-opacity=".45"/>'
-    else:
-        pct = max(0.0, min(100.0, float(pct)))
-        arco = ('<circle class="arco" cx="50" cy="50" r="43" fill="none" stroke-width="7" pathLength="100" '
-                f'stroke-dasharray="{pct:.1f} 100" stroke-opacity="{1 if pct > 0 else 0}"/>')
-    return (f'<div class="sia-anillo" style="{estilo}" role="img" aria-label="{escape(texto)}">'
-            '<svg viewBox="0 0 100 100" aria-hidden="true">'
-            '<circle class="pista" cx="50" cy="50" r="43" fill="none" stroke-width="7"/>'
-            f'{arco}</svg><div class="centro"><span class="value">{escape(texto)}</span></div></div>')
+    progreso = 100.0 if pct is None else max(0.0, min(100.0, float(pct)))
+    estilo = f"--fs:{fs}rem;--progreso:{progreso:.2f}%;"
+    estilo += (f"--tono:{color};" if color else "") + (f"--d:{diametro}px;" if diametro else "")
+    css = "sia-anillo sin-datos" if texto == "—" else "sia-anillo"
+    etiqueta = texto if pct is None or _pct_de(texto) is not None else f"{texto}, {progreso:.1f}%"
+    return (f'<div class="{css}" style="{estilo}" role="img" aria-label="{escape(etiqueta)}">'
+            f'<div class="centro"><span class="value">{escape(texto)}</span></div></div>')
 
 
 def _kpi_html(label: str, valor, sub: str = "", tono: str = "neutro", pct: float | None = None) -> str:

@@ -12,6 +12,7 @@ from html import escape
 import streamlit as st
 
 from core import validaciones as val
+from core.reportes import clave_alfabetica
 from models import cuentas
 from models.institucion import NOMBRES_ROL, Institucion
 from models.persona import Persona, RepositorioPersonas
@@ -19,6 +20,18 @@ from utils.qr import contenido_invitacion, generar_qr_png
 from views.styles import aviso, mostrar_errores
 
 _CLAVE_CREDENCIAL = "_credencial_{}"
+
+
+def filtrar_personas(personas, busqueda: str):
+    termino = clave_alfabetica(busqueda.strip())
+    if not termino:
+        return personas
+    return personas[personas["dni"].str.contains(termino, regex=False)
+                    | personas["apellido"].map(clave_alfabetica).str.contains(termino, regex=False)]
+
+
+def opciones_personas(personas) -> dict[int, str]:
+    return {int(f.id): f"{f.apellido}, {f.nombre} · DNI {f.dni}" for f in personas.itertuples()}
 
 
 def guardar_credencial(clave: str, persona: Persona, rol: str, temporal: str | None, token: str | None,
@@ -35,6 +48,7 @@ def tarjeta_credencial(clave: str) -> None:
     datos = st.session_state.get(_CLAVE_CREDENCIAL.format(clave))
     if not datos:
         return
+    enlace = contenido_invitacion(datos["token"]) if datos["token"] else None
     with st.container(border=True, key=f"sia_credencial_{clave}"):
         titulo = "Acceso restablecido" if datos["motivo"] == "restablecer" else "Acceso creado"
         st.markdown(f"#### {titulo}: {escape(datos['nombre'])}")
@@ -45,17 +59,15 @@ def tarjeta_credencial(clave: str) -> None:
             aviso(f"<b>Usuario:</b> {escape(datos['dni'])} (su DNI)<br>"
                   f"<b>Clave temporal:</b> <span class='sia-code'>{escape(datos['temporal'] or '—')}</span><br>"
                   "Al ingresar, el sistema le pide crear su propia contraseña.")
-            if datos["token"]:
-                enlace = contenido_invitacion(datos["token"])
+            if enlace:
                 st.caption(f"QR de invitación: un solo uso, vence en {cuentas.HORAS_INVITACION} horas. "
                            "Al escanearlo con el celular entra directo a crear su contraseña.")
                 st.code(enlace, language=None)
-        if datos["token"]:
+        if enlace:
             with qr:
-                png = generar_qr_png(contenido_invitacion(datos["token"]), box_size=7, color="#142033")
+                png = generar_qr_png(enlace, box_size=9, color="#142033")
                 st.image(png, caption="QR de invitación", width=220)
-                st.download_button("Descargar QR", generar_qr_png(contenido_invitacion(datos["token"]), box_size=14,
-                                                                 color="#142033"),
+                st.download_button("Descargar QR", png,
                                    file_name=f"invitacion_{datos['dni']}.png", mime="image/png",
                                    key=f"dl_inv_{clave}", icon=":material/download:", width="stretch")
         if st.button("Listo, ya lo entregué", key=f"cerrar_cred_{clave}", icon=":material/check:"):
@@ -66,7 +78,7 @@ def tarjeta_credencial(clave: str) -> None:
 def form_alta(institucion: Institucion, roles: tuple[str, ...], clave: str, creado_por: int | None,
               titulo: str = "Dar de alta", boton: str = "Dar de alta y generar invitación") -> None:
     """Alta con DNI. Si la persona ya tiene cuenta (por ejemplo, en otra institución) solo se le asigna el rol."""
-    with st.form(f"form_alta_{clave}", clear_on_submit=True):
+    with st.form(f"form_alta_{clave}"):
         st.markdown(f"##### {escape(titulo)}")
         st.caption("Si la persona ya tiene cuenta alcanza con el DNI. Si no, completá sus datos: el sistema crea "
                    "su usuario, una clave temporal y un QR de invitación.")

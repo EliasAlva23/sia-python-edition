@@ -17,7 +17,7 @@ from models.predictor_ia import PredictorRiesgoIA
 from utils.qr import decodificar_qr, generar_qr_png, interpretar_codigo
 from views import graficos
 from views.escaner import escaner_qr
-from views.justificativos import formulario_alumno
+from views.justificativos import formulario_personal
 from views.styles import (
     TONOS,
     alerta,
@@ -58,7 +58,7 @@ def render(estudiante: Estudiante) -> None:
     nombres = ["Dar presente", "Unirme a una materia", "Mi historial", "Mi credencial"]
     if opcion("justificativos_alumnos"):
         nombres.insert(3, "Justificativos")
-    tabs = dict(zip(nombres, st.tabs(nombres), strict=True))
+    tabs = dict(zip(nombres, st.tabs(nombres, key="alu_tabs", on_change="rerun"), strict=True))
     with tabs["Dar presente"]:
         _tab_presente(estudiante, materias)
     with tabs["Unirme a una materia"]:
@@ -67,7 +67,7 @@ def render(estudiante: Estudiante) -> None:
         _tab_historial(materias, df, estudiante)
     if "Justificativos" in tabs:
         with tabs["Justificativos"]:
-            formulario_alumno(_institucion_id(), estudiante.id, materias)
+            formulario_personal(_institucion_id(), estudiante.id, materias, "estudiante")
     with tabs["Mi credencial"]:
         _tab_credencial(estudiante)
 
@@ -205,7 +205,7 @@ def _resumen(materias: list[Materia], df: pd.DataFrame) -> None:
         ("Asistencia general", f"{general:.0f}%" if total else "—",
          f"{presentes} de {total} clases" if total else "Sin clases todavía",
          tono_porcentaje(general, 75) if total else "neutro"),
-        ("Presentes", presentes, "incluye tardes y justificadas", "neutro", 100 * presentes / total if total else None),
+        ("Presentes", presentes, "incluye tardes y justificadas", "verde", 100 * presentes / total if total else None),
         ("Ausencias", total - presentes, f"Racha actual: {racha}", "rojo" if racha >= 2 else "neutro",
          100 * (total - presentes) / total if total else None),
         ("Materias", len(materias), tema()["corto"], "neutro"),

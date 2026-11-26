@@ -127,12 +127,15 @@ def test_alumno_sin_cuenta_crea_su_acceso_desde_el_qr_de_la_clase(app, instituci
 
 
 def test_preceptoria_da_de_alta_un_docente_con_qr(app, institucion):
+    from core import sesiones
     from models import cuentas
     from models.institucion import tiene_rol
     from models.persona import RepositorioPersonas
 
     pre = cuentas.crear_o_asignar(institucion.id, "preceptor", "28111222", "Marta", "Díaz", "marta@ejemplo.com").persona
     RepositorioPersonas.guardar_password(pre, "Preceptoria2026")
+    docente = cuentas.crear_o_asignar(institucion.id, "docente", "30888111", "Alex", "Téllez", "alex@ejemplo.com").persona
+    sesiones.crear(docente.id, institucion.id, "docente")
     app.run()
     _ingresar(app, "28111222", "Preceptoria2026")
     assert not app.exception
@@ -150,6 +153,9 @@ def test_preceptoria_da_de_alta_un_docente_con_qr(app, institucion):
     assert "Acceso creado: Pablo Ruiz" in _textos(app)
     assert "QR de invitación: un solo uso" in _textos(app)
     assert any(b.label == "Descargar QR" for b in app.get("download_button"))
+    _campo(app, "Buscar docente por DNI o apellido").input("30555666").run()
+    assert not app.exception
+    assert "sin actividad registrada" in _textos(app)
 
 
 @pytest.mark.parametrize("rol, titulo", [("directivo", "Panel de Rectoría · Dirección"), ("estudiante", "Hola, Ana")])

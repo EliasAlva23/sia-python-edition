@@ -268,32 +268,38 @@ class Materia:
         return cls._desde_fila(fila) if fila else None
 
     @classmethod
-    def de_docente(cls, docente_id: int, institucion_id: int | None = None) -> list["Materia"]:
+    def de_docente(cls, docente_id: int, institucion_id: int | None = None, *,
+                   incluir_archivadas: bool = False) -> list["Materia"]:
         filtro = "AND institucion_id = ?" if institucion_id else ""
+        activas = "" if incluir_archivadas else "AND activa = 1"
         with get_connection() as conn:
             filas = conn.execute(
-                f"SELECT * FROM materias WHERE docente_id = ? AND activa = 1 {filtro} ORDER BY nombre",
+                f"SELECT * FROM materias WHERE docente_id = ? {activas} {filtro} ORDER BY nombre",
                 (docente_id, institucion_id) if institucion_id else (docente_id,),
             ).fetchall()
         return [cls._desde_fila(f) for f in filas]
 
     @classmethod
-    def de_estudiante(cls, estudiante_id: int, institucion_id: int | None = None) -> list["Materia"]:
+    def de_estudiante(cls, estudiante_id: int, institucion_id: int | None = None, *,
+                      incluir_archivadas: bool = False) -> list["Materia"]:
         filtro = "AND m.institucion_id = ?" if institucion_id else ""
+        activas = "" if incluir_archivadas else "AND m.activa = 1"
         with get_connection() as conn:
             filas = conn.execute(
                 f"""SELECT m.* FROM materias m JOIN inscripciones i ON i.materia_id = m.id
-                    WHERE i.estudiante_id = ? AND m.activa = 1 {filtro} ORDER BY m.nombre""",
+                    WHERE i.estudiante_id = ? {activas} {filtro} ORDER BY m.nombre""",
                 (estudiante_id, institucion_id) if institucion_id else (estudiante_id,),
             ).fetchall()
         return [cls._desde_fila(f) for f in filas]
 
     @classmethod
-    def de_institucion(cls, institucion_id: int, carrera_id: int | None = None) -> list["Materia"]:
+    def de_institucion(cls, institucion_id: int, carrera_id: int | None = None, *,
+                       incluir_archivadas: bool = False) -> list["Materia"]:
         filtro = "AND carrera_id = ?" if carrera_id else ""
+        activas = "" if incluir_archivadas else "AND activa = 1"
         with get_connection() as conn:
             filas = conn.execute(
-                f"SELECT * FROM materias WHERE institucion_id = ? AND activa = 1 {filtro} ORDER BY nombre",
+                f"SELECT * FROM materias WHERE institucion_id = ? {activas} {filtro} ORDER BY nombre",
                 (institucion_id, carrera_id) if carrera_id else (institucion_id,),
             ).fetchall()
         return [cls._desde_fila(f) for f in filas]

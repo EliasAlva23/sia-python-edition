@@ -11,6 +11,18 @@ _AYUDA_DRIVE = ("Para habilitarlo, quien administra la app debe cargar las crede
                 "Secrets (ver docs/ARQUITECTURA.md, sección Google Drive).")
 
 
+def planilla_asistencia(registros: pd.DataFrame, fechas: list[str], materias: dict[int, str]) -> pd.DataFrame:
+    """Matriz de asistencia por alumno y materia, con columnas cronológicas de clase."""
+    indice = ["materia_id", "alumno", "dni"]
+    marcas = {"presente": "P", "ausente": "A", "tarde": "T", "justificado": "J"}
+    matriz = (registros.assign(marca=registros["estado"].map(marcas))
+             .pivot(index=indice, columns="fecha", values="marca")
+             .reindex(columns=fechas).fillna("").reset_index())
+    matriz["materia_id"] = matriz["materia_id"].map(materias)
+    matriz.columns.name = None
+    return matriz.rename(columns={"materia_id": "Materia", "alumno": "Alumno", "dni": "DNI"})
+
+
 def boton_drive(nombre: str, contenido: bytes, clave: str, etiqueta: str = "☁️ Enviar a Google Drive") -> None:
     if not drive_configurado():
         st.button(etiqueta, key=clave, disabled=True, width="stretch", help=_AYUDA_DRIVE)

@@ -136,7 +136,20 @@ def _crear() -> None:
         for alumno in inscriptos:
             materia.inscribir(alumno.id)
         _historial(materia, inscriptos, docentes[MATERIAS[indice][0]].id)
+        _fechar_inscripciones_demo(materia.id, [alumno.id for alumno in inscriptos])
     _justificativos(inst, alumnos, materias)
+
+
+def _fechar_inscripciones_demo(materia_id: int, alumno_ids: list[int]) -> None:
+    """Incluye las clases históricas en la cursada de los alumnos ficticios."""
+    with get_connection() as conn:
+        primera = conn.execute("SELECT MIN(fecha) FROM clases WHERE materia_id = ?", (materia_id,)).fetchone()[0]
+        if primera:
+            conn.executemany(
+                """UPDATE inscripciones SET inscripto_en = ?
+                   WHERE materia_id = ? AND estudiante_id = ? AND substr(inscripto_en, 1, 10) > ?""",
+                [(f"{primera}T00:00:00", materia_id, persona_id, primera) for persona_id in alumno_ids],
+            )
 
 
 def _materias(inst, docentes, carreras):

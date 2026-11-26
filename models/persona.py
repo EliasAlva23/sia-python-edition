@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 import sqlite3
 from abc import ABC, abstractmethod
+from contextlib import nullcontext
 from datetime import timedelta
 
 from core import security
@@ -229,18 +230,20 @@ class RepositorioPersonas:
         return clase(**comunes)
 
     @classmethod
-    def registrar(cls, persona: Persona) -> Persona:
+    def registrar(cls, persona: Persona, *, conn: sqlite3.Connection | None = None,
+                  temporal: bool = False) -> Persona:
         password_hash, salt = persona._credenciales()
         datos = persona.to_dict()
         try:
-            with get_connection() as conn:
-                cur = conn.execute(
+            with nullcontext(conn) if conn is not None else get_connection() as conexion:
+                cur = conexion.execute(
                     """INSERT INTO usuarios
-                       (dni, nombre, apellido, email, rol, password_hash, salt, legajo, departamento, creado_en)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                       (dni, nombre, apellido, email, rol, password_hash, salt, legajo, departamento,
+                        creado_en, debe_cambiar_password)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         datos["dni"], datos["nombre"], datos["apellido"], datos["email"], datos["rol"],
-                        password_hash, salt, datos.get("legajo"), datos.get("departamento"), ahora_iso(),
+                        password_hash, salt, datos.get("legajo"), datos.get("departamento"), ahora_iso(), int(temporal),
                     ),
                 )
                 persona._asignar_id(cur.lastrowid)

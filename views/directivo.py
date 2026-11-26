@@ -1,7 +1,7 @@
 """Panel de Rectoría / Dirección general: vista ejecutiva, carreras, personal y configuración institucional."""
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 
 import pandas as pd
 import streamlit as st
@@ -31,13 +31,15 @@ from views.styles import (
     tono_porcentaje,
 )
 
-PERIODOS = {"Últimos 30 días": 30, "Últimos 90 días": 90, "Todo el ciclo": None}
+PERIODOS = {"Semanal": ("D", "día"), "Mensual": ("W-SUN", "semana"), "Anual": ("M", "mes")}
+ROLES_DIRECCION = ("preceptor", "directivo")
 
 
 def render(directivo: Persona) -> None:
     inst = Institucion.obtener(st.session_state["institucion_id"])
     encabezado("Panel de Rectoría · Dirección", "Cómo viene la asistencia, la regularidad y la promoción")
-    tabs = st.tabs(["Resumen institucional", "Carreras y materias", "Personal", "Configuración"])
+    tabs = st.tabs(["Resumen institucional", "Carreras y materias", "Personal", "Configuración"],
+                   key="dir_tabs", on_change="rerun")
     with tabs[0]:
         _resumen(inst)
     with tabs[1]:
@@ -61,14 +63,13 @@ def _docentes(ids: list[int]) -> dict[int, str]:
     return {f["id"]: f["n"] for f in filas}
 
 
-def _datos(inst: Institucion, dias: int | None) -> tuple[pd.DataFrame, pd.DataFrame, list[Materia]]:
+def _datos(inst: Institucion, desde: date, hasta: date) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Registros (alumno x clase) y resumen por alumno-materia con condición y riesgo."""
-    materias = Materia.de_institucion(inst.id)
+    materias = Materia.de_institucion(inst.id, incluir_archivadas=True)
     df = Materia.registros_df([m.id for m in materias])
-    if dias and not df.empty:
-        df = df[df["fecha"] >= (hoy() - timedelta(days=dias)).isoformat()]
+    df = df[df["fecha"].between(desde.isoformat(), hasta.isoformat())]
     if df.empty:
-        return df, pd.DataFrame(), materias
+        return df, pd.DataFrame()
     meta = {m.id: m for m in materias}
     carreras = {int(r.id): r.nombre for r in inst.carreras(solo_activas=False).itertuples()}
     docentes = _docentes(sorted({m.docente_id for m in materias}))
@@ -78,16 +79,29 @@ def _datos(inst: Institucion, dias: int | None) -> tuple[pd.DataFrame, pd.DataFr
     prediccion["materia_id"] = prediccion["clave"].str.split("-").str[0].astype(int)
     prediccion["condicion"] = [meta[m].condicion(p) for m, p in zip(prediccion["materia_id"], prediccion["pct_asistencia"], strict=True)]
     prediccion["carrera"] = prediccion["materia_id"].map(lambda i: carreras.get(meta[i].carrera_id, "Sin carrera"))
-    return df, prediccion, materias
+    return df, prediccion
 
 
 # ---------------------------------------------------------------- resumen ejecutivo
 def _resumen(inst: Institucion) -> None:
-    periodo = st.radio("Período", list(PERIODOS), horizontal=True, key="dir_periodo", label_visibility="collapsed")
-    df, alumnos, materias = _datos(inst, PERIODOS[periodo])
+    c1, c2 = st.columns([2, 1], vertical_alignment="bottom")
+    periodo = c1.radio("Período", list(PERIODOS), horizontal=True, key="dir_periodo")
+    referencia = c2.date_input("Fecha de referencia", hoy(), format="DD/MM/YYYY", key="dir_referencia")
+    fecha = pd.Timestamp(referencia)
+    if periodo == "Semanal":
+        desde = referencia - timedelta(days=referencia.weekday())
+        hasta = desde + timedelta(days=6)
+    elif periodo == "Mensual":
+        mes = fecha.to_period("M")
+        desde, hasta = mes.start_time.date(), mes.end_time.date()
+    else:
+        desde, hasta = date(referencia.year, 1, 1), date(referencia.year, 12, 31)
+    st.caption(f"Del {desde:%d/%m/%Y} al {hasta:%d/%m/%Y}")
+    df, alumnos = _datos(inst, desde, hasta)
+    activas = len(Materia.de_institucion(inst.id))
     personas = inst.personas()
     if df.empty:
-        kpi_grid([("Materias activas", len(materias), "", "neutro"),
+        kpi_grid([("Materias activas", activas, "", "neutro"),
                   ("Docentes", int((personas["rol"] == "docente").sum()), "", "neutro"),
                   ("Estudiantes", int((personas["rol"] == "estudiante").sum()), "", "neutro")])
         st.info("Todavía no hay clases registradas en el período elegido.")
@@ -103,7 +117,7 @@ def _resumen(inst: Institucion) -> None:
         ("Regulares", f"{100 * cond.get('Regular', 0) / total:.0f}%", f"umbral {inst.umbral_regular:.0f}%", "neutro"),
         ("Libres", f"{100 * cond.get('Libre', 0) / total:.0f}%", f"{cond.get('Libre', 0)} cursadas", "rojo" if cond.get("Libre", 0) else "neutro"),
         ("En riesgo alto", riesgo, f"de {total} cursadas", "rojo" if riesgo else "verde", 100 * riesgo / total),
-        ("Materias activas", len(materias), f"{df['estudiante_id'].nunique()} estudiantes con clases", "neutro"),
+        ("Materias activas", activas, f"{df['estudiante_id'].nunique()} estudiantes con clases", "neutro"),
     ])
 
     c1, c2 = st.columns(2)
@@ -114,9 +128,11 @@ def _resumen(inst: Institucion) -> None:
     with c2:
         conteos = alumnos.groupby(["carrera", "condicion"]).size().unstack(fill_value=0).reset_index()
         graficos.condicion_apilada(conteos, "carrera", "Condición de las cursadas por carrera")
-    semanal = (df.assign(semana=pd.to_datetime(df["fecha"]).dt.to_period("W-SUN").dt.start_time)
-                 .groupby("semana")["presente"].mean().mul(100).reset_index(name="asistencia"))
-    graficos.tendencia(semanal, "semana", "asistencia", umbral=inst.umbral_regular, titulo="Asistencia institucional por semana")
+    frecuencia, unidad = PERIODOS[periodo]
+    tendencia = (df.assign(fecha=pd.to_datetime(df["fecha"]).dt.to_period(frecuencia).dt.start_time)
+                   .groupby("fecha")["presente"].mean().mul(100).reset_index(name="asistencia"))
+    graficos.tendencia(tendencia, "fecha", "asistencia", umbral=inst.umbral_regular,
+                       titulo=f"Asistencia institucional por {unidad}")
 
     por_materia = (df.groupby(["materia_id", "materia", "docente", "carrera"])
                      .agg(asistencia=("presente", "mean"), clases=("clase_id", "nunique")).reset_index())
@@ -152,7 +168,7 @@ def _resumen(inst: Institucion) -> None:
     resumen_materias = por_materia.drop(columns=["materia_id"]).round({"asistencia": 1})
     detalle = alumnos[["carrera", "materia", "alumno", "dni", "pct_asistencia", "condicion", "nivel", "motivos"]].round(
         {"pct_asistencia": 1})
-    exportaciones(f"reporte_institucional_{inst.slug}_{hoy():%Y%m%d}",
+    exportaciones(f"reporte_institucional_{inst.slug}_{desde:%Y%m%d}_{hasta:%Y%m%d}",
                   {"Materias": resumen_materias, "Alumnos": detalle}, "dir_export")
 
 
@@ -191,25 +207,25 @@ def _carreras(inst: Institucion) -> None:
                     else:
                         st.rerun()
 
-    st.markdown("#### Carreras de cada docente")
-    docentes = inst.personas("docente")
+    st.markdown("#### Asignar preceptores a carreras")
+    preceptores = inst.personas("preceptor")
     activas = {int(f.id): f.nombre for f in carreras.itertuples() if f.activa}
-    if docentes.empty or not activas:
-        st.caption("Cargá carreras y docentes para asignarlas.")
+    if preceptores.empty or not activas:
+        st.caption("Cargá carreras activas y preceptores para asignarlas.")
     else:
-        nombres = {int(f.id): f"{f.apellido}, {f.nombre}" for f in docentes.itertuples()}
-        c1, c2 = st.columns([1, 2], vertical_alignment="bottom")
-        docente = c1.selectbox("Docente", list(nombres), format_func=nombres.get, key="dir_doc")
-        actuales = [c for c, _ in inst.carreras_de_docente(docente)]
-        with c2.form(f"form_doc_car_{docente}"):
+        nombres = personal.opciones_personas(preceptores)
+        elegido = st.selectbox("Preceptor", list(nombres), format_func=nombres.get, key="dir_preceptor")
+        actuales = [c for c, _ in inst.carreras_de_preceptor(elegido)]
+        with st.form(f"form_preceptor_car_{elegido}"):
             elegidas = st.multiselect("Carreras asignadas", list(activas), default=actuales, format_func=activas.get)
             if st.form_submit_button("Guardar asignación", type="primary"):
-                inst.asignar_carreras(docente, elegidas)
-                st.toast("Carreras asignadas")
-                st.rerun()
-        filas = [{"docente": nombres[int(f.id)], "carreras": ", ".join(n for _, n in inst.carreras_de_docente(int(f.id))) or None,
-                  "materias": len(Materia.de_docente(int(f.id), inst.id))} for f in docentes.itertuples()]
-        tabla_html(filas, {"docente": "Docente", "carreras": "Carreras", "materias": "Materias"})
+                try:
+                    inst.asignar_carreras_preceptor(elegido, elegidas)
+                except ValueError as exc:
+                    st.error(str(exc))
+                else:
+                    st.toast("Carreras asignadas")
+                    st.rerun()
 
 
 # ---------------------------------------------------------------- personal
@@ -217,19 +233,30 @@ def _personal(inst: Institucion, directivo: Persona) -> None:
     plantel = inst.personas()
     plantel = plantel[plantel["rol"].isin(ROLES_PERSONAL)]
     st.markdown("#### Personal de la institución")
-    tabla_html([{"nombre": f"{f.apellido}, {f.nombre}", "dni": f.dni, "email": f.email, "rol": NOMBRES_ROL[f.rol]}
-                for f in plantel.itertuples()],
-               {"nombre": "Nombre", "dni": "DNI", "email": "Email", "rol": "Rol"}, vacio="Todavía no hay personal cargado.")
+    c1, c2 = st.columns([2, 1])
+    busqueda = c1.text_input("Buscar personal por DNI o apellido", key="dir_personal_buscar")
+    rol = c2.selectbox("Filtrar por rol", [None, *ROLES_PERSONAL],
+                       format_func=lambda r: NOMBRES_ROL.get(r, "Todos"), key="dir_personal_rol")
+    plantel = personal.filtrar_personas(plantel, busqueda)
+    if rol:
+        plantel = plantel[plantel["rol"] == rol]
+    listado = plantel[["apellido", "nombre", "dni", "email", "rol"]].copy()
+    listado["rol"] = listado["rol"].map(NOMBRES_ROL)
+    st.dataframe(listado, hide_index=True, height=260,
+                 column_config={"apellido": "Apellido", "nombre": "Nombre", "dni": "DNI",
+                                "email": "Email", "rol": "Rol"})
     personal.tarjeta_credencial("dir_personal")
     c1, c2 = st.columns(2)
     with c1:
-        personal.form_alta(inst, ROLES_PERSONAL, "dir_personal", directivo.id, titulo="Asignar un rol o dar de alta")
+        personal.form_alta(inst, ROLES_DIRECCION, "dir_personal", directivo.id,
+                           titulo="Dar de alta a Preceptoría o Dirección")
     with c2:
-        if not plantel.empty:
+        gestion = plantel[plantel["rol"].isin(ROLES_DIRECCION)]
+        if not gestion.empty:
             with st.form("form_quitar_rol"):
                 st.markdown("##### Quitar un rol")
-                opciones = [(int(f.id), f.rol) for f in plantel.itertuples()]
-                nombres = {(int(f.id), f.rol): f"{f.apellido}, {f.nombre} · {NOMBRES_ROL[f.rol]}" for f in plantel.itertuples()}
+                opciones = [(int(f.id), f.rol) for f in gestion.itertuples()]
+                nombres = {(int(f.id), f.rol): f"{f.apellido}, {f.nombre} · {NOMBRES_ROL[f.rol]}" for f in gestion.itertuples()}
                 elegido = st.selectbox("Persona y rol", opciones, format_func=nombres.get)
                 if st.form_submit_button("Quitar rol"):
                     if elegido == (directivo.id, "directivo"):

@@ -13,7 +13,8 @@ from core.security import validar_fortaleza
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 TURNOS = ("Mañana", "Tarde", "Noche")
 CURSOS = ("1° Año", "2° Año", "3° Año", "4° Año")
-COMISIONES = ("Comisión 1", "Comisión 2", "Comisión 3", "Comisión 4", "Comisión 5", "Comisión 6", "Comisión única")
+COMISIONES = ("Primera", "Segunda", "Tercera", "Comisión única",
+             "Comisión 1", "Comisión 2", "Comisión 3", "Comisión 4", "Comisión 5", "Comisión 6")
 DIAS_SEMANA = ("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado")
 HORAS = tuple(f"{h:02d}:{m:02d}" for h in range(7, 24) for m in range(0, 60, 10))  # 07:00 … 23:50, cada 10 min
 TOLERANCIAS_TARDE = (0, 10, 20, 30, 40, 50, 60)  # minutos después del inicio para registrar «tarde»

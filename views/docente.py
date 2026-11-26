@@ -14,6 +14,7 @@ from core.reportes import (
     nombre_reporte_clase,
     reporte_clase,
 )
+from core.tiempo import hoy
 from core.validaciones import (
     COMISIONES,
     CURSOS,
@@ -27,7 +28,6 @@ from models.asistencia import (
     VENTANA_SEGUNDOS,
     RegistroAsistencia,
     ResultadoMarcado,
-    segundos_restantes,
 )
 from models.institucion import Institucion, opcion
 from models.materia import RESULTADOS, Materia
@@ -42,8 +42,8 @@ from utils.qr import (
 )
 from views import auth, graficos
 from views.escaner import escaner_qr
-from views.exportar import boton_drive, exportaciones
-from views.justificativos import bandeja
+from views.exportar import boton_drive, exportaciones, planilla_asistencia
+from views.justificativos import bandeja, formulario_personal
 from views.styles import (
     COLORES_CONDICION,
     COLORES_NIVEL,
@@ -64,6 +64,8 @@ from views.styles import (
 )
 
 DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+MESES = ("Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre",
+         "Octubre", "Noviembre", "Diciembre")
 TAB_HISTORIAL = "Historial y estadísticas"
 ESTADOS = {"presente": "Presente", "tarde": "Tarde", "justificado": "Justificado", "ausente": "Ausente"}
 METODOS = {"qr_credencial": "QR credencial", "qr_clase": "QR de clase", "pin": "PIN", "manual": "Manual",
@@ -80,26 +82,34 @@ def render(docente: Docente) -> None:
     institucion = _institucion()
     carreras = institucion.carreras_de_docente(docente.id)
     encabezado("Panel docente", " · ".join(n for _, n in carreras) or "Tus materias, tus clases y la asistencia")
-    materias = _filtrar_por_carrera(Materia.de_docente(docente.id, institucion.id), carreras)
+    materias_activas = Materia.de_docente(docente.id, institucion.id)
+    materias = _filtrar_por_carrera(materias_activas, carreras)
     _banner_riesgo(materias)
     materia = _selector_materia(materias)
 
-    tabs = st.tabs(["Materias", "Clase en vivo", "Lector QR", TAB_HISTORIAL, "Justificativos"])
-    with tabs[0]:
-        _tab_materias(docente, institucion, materias, carreras)
-    with tabs[4]:
-        bandeja(institucion.id, docente.id, docente_id=docente.id, clave="doc")
-    if materia is None:
-        for tab in tabs[1:4]:
+    tabs = st.tabs(["Materias", "Clase en vivo", "Lector QR", TAB_HISTORIAL, "Justificativos"],
+                   key="doc_tabs", on_change="rerun")
+    if tabs[0].open:
+        with tabs[0]:
+            _tab_materias(docente, institucion, materias, carreras)
+    if tabs[4].open:
+        with tabs[4]:
+            formulario_personal(institucion.id, docente.id, materias_activas, "docente")
+            st.divider()
+            st.markdown("### Justificativos de mis alumnos")
+            bandeja(institucion, docente.id, docente_id=docente.id, clave="doc")
+    if tabs[3].open:
+        with tabs[3]:
+            _exportar_asistencia(Materia.de_docente(docente.id, institucion.id, incluir_archivadas=True), materia)
+            if materia is not None:
+                _tab_historial(materia, materias)
+    for tab, vista in zip(tabs[1:3], (_tab_clase, _tab_lector), strict=True):
+        if tab.open:
             with tab:
-                st.info("Creá tu primera materia en la pestaña **Materias** para comenzar.")
-        return
-    with tabs[1]:
-        _tab_clase(docente, materia)
-    with tabs[2]:
-        _tab_lector(docente, materia)
-    with tabs[3]:
-        _tab_historial(materia, materias)
+                if materia is None:
+                    st.info("Creá tu primera materia en la pestaña **Materias** para comenzar.")
+                else:
+                    vista(docente, materia)
 
 
 def _filtrar_por_carrera(materias: list[Materia], carreras: list[tuple[int, str]]) -> list[Materia]:
@@ -335,6 +345,7 @@ def _tab_clase(docente: Docente, materia: Materia) -> None:
     if clase is None or not clase["abierta"]:
         st.markdown(f"#### {escape(materia.nombre)}")
         st.markdown(_chips_materia(materia), unsafe_allow_html=True)
+        st.caption("Al iniciar la clase podés proyectar el QR y el PIN o abrir «Lector QR» para escanear credenciales.")
         if clase is not None:
             st.info("La clase de hoy está **cerrada**. Podés reabrirla para seguir registrando asistencia.")
         with st.form(f"abrir_{materia.id}"):
@@ -397,14 +408,14 @@ def _qr_dinamico(clase_id: int) -> None:
     """QR y PIN se recalculan cada 2 s: el cambio de ventana (30 s) se refleja enseguida, sin desfase."""
     auth.registrar_actividad()  # proyectar el QR cuenta como actividad del docente
     registro = RegistroAsistencia(clase_id)
+    token, pin, restante = registro.codigos_proyeccion()
     with st.container(border=True):
-        st.markdown("**QR de asistencia** — proyectalo para que los alumnos lo escaneen")
+        st.markdown("**QR de asistencia para proyectar**")
         st.caption("Quien todavía no tiene cuenta puede crear su acceso al escanearlo.")
-        st.image(generar_qr_png(contenido_asistencia(registro.generar_token()), box_size=12), width="stretch")
-        restante = segundos_restantes()
+        st.image(generar_qr_png(contenido_asistencia(token), box_size=12), width=320)
         st.progress(restante / VENTANA_SEGUNDOS, text=f"Código firmado · cambia en {restante} s")
         st.caption("PIN para quienes no pueden usar la cámara")
-        codigo(registro.generar_pin(), grande=True)
+        codigo(pin, grande=True)
 
 
 def _filas_presentes(presentes: pd.DataFrame) -> list[dict]:
@@ -503,6 +514,7 @@ def _tab_lector(docente: Docente, materia: Materia) -> None:
     registro = RegistroAsistencia(clase["id"])
     clave_resultados = f"lector_resultados_{clase['id']}"
     st.markdown(f"#### Escanear credenciales · {escape(materia.nombre)}")
+    st.caption("Escaneá el QR de la credencial de cada alumno. El QR para proyectar está en «Clase en vivo».")
     col_cam, col_res = st.columns([1.2, 1])
     with col_cam:
         modo = st.radio("Modo", ["Cámara en vivo", "Foto", "Manual / lector USB"], horizontal=True,
@@ -549,6 +561,42 @@ def _tab_lector(docente: Docente, materia: Materia) -> None:
 
 
 # ---------------------------------------------------------------- Historial y estadísticas
+def _exportar_asistencia(materias: list[Materia], activa: Materia | None) -> None:
+    if not materias:
+        return
+    with st.expander("Exportar planilla de asistencia"):
+        nombres = {m.id: f"{m.nombre} · {m.curso_comision}".rstrip(" ·") for m in materias}
+        opciones = [None, *nombres]
+        materia_id = st.selectbox("Materia para exportar", opciones, index=opciones.index(activa.id) if activa else 0,
+                                  format_func=lambda i: nombres.get(i, "Todas mis materias"))
+        seleccion = [m for m in materias if materia_id is None or m.id == materia_id]
+        fechas = sorted({fecha for materia in seleccion for fecha in materia.clases()["fecha"]})
+        if not fechas:
+            st.caption("Todavía no hay clases registradas para exportar.")
+            return
+        c1, c2 = st.columns(2)
+        anios = sorted({hoy().year, *(int(fecha[:4]) for fecha in fechas)}, reverse=True)
+        anio = c1.selectbox("Ciclo lectivo", anios, index=anios.index(int(fechas[-1][:4])))
+        periodo = c2.radio("Exportar por", ["Mes", "Ciclo lectivo completo"], horizontal=True)
+        prefijo = str(anio)
+        if periodo == "Mes":
+            meses = sorted({int(fecha[5:7]) for fecha in fechas if fecha.startswith(prefijo)})
+            if not meses:
+                st.caption("No hay clases registradas en ese ciclo.")
+                return
+            mes = st.selectbox("Mes", meses, index=len(meses) - 1, format_func=lambda n: MESES[n - 1])
+            prefijo = f"{anio}-{mes:02d}"
+        fechas = [fecha for fecha in fechas if fecha.startswith(prefijo)]
+        if not fechas:
+            st.caption("No hay clases registradas para el período elegido.")
+            return
+        df = Materia.registros_df([m.id for m in seleccion])
+        planilla = planilla_asistencia(df[df["fecha"].isin(fechas)], fechas, nombres)
+        st.caption("Una columna por fecha de clase. P = presente, A = ausente, T = tardanza, J = justificada.")
+        nombre = f"asistencia_{materia_id or 'todas'}_{prefijo}"
+        exportaciones(nombre, {"Asistencia": planilla}, "doc_planilla")
+
+
 def _tab_historial(materia: Materia, materias: list[Materia]) -> None:
     alcance = st.radio("Alcance", ["Materia activa", "Todas mis materias"], horizontal=True, key="alcance_historial")
     seleccion = [materia] if alcance == "Materia activa" else materias
