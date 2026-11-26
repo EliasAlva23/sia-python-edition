@@ -152,8 +152,10 @@ def invitacion_pendiente(usuario_id: int, institucion_id: int) -> datetime | Non
 def puede_gestionar_clave(usuario_id: int, institucion_id: int, roles_permitidos: tuple[str, ...] = ("docente",)) -> bool:
     """Preceptoría solo restablece claves de cuentas que pertenecen únicamente a su institución y con roles
     permitidos: así no puede tomar el control de un directivo, de otra institución ni de la Administración."""
+    from models.demo import es_cuenta_demo
+
     persona = RepositorioPersonas.obtener(usuario_id)
-    if persona is None or es_superadmin(persona.dni):
+    if persona is None or es_superadmin(persona.dni) or es_cuenta_demo(persona.dni):
         return False
     with get_connection() as conn:
         filas = conn.execute("SELECT institucion_id, rol FROM membresias WHERE usuario_id = ?", (usuario_id,)).fetchall()

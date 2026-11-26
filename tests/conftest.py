@@ -16,6 +16,8 @@ def db(tmp_path, monkeypatch):
     ruta = tmp_path / "sia_test.db"
     monkeypatch.setenv("SIA_DB_PATH", str(ruta))
     monkeypatch.setenv("SIA_SECRET", "clave-de-pruebas-no-usar-en-produccion")
+    monkeypatch.setenv("SIA_DEMO", "0")  # cada prueba activa la demostración solo si la necesita
+    monkeypatch.delenv("SIA_DEMO_CLAVE", raising=False)
     monkeypatch.delenv("SIA_SUPERADMINS", raising=False)
     monkeypatch.delenv("SIA_SUPERADMIN_CLAVE_INICIAL", raising=False)
     import core.database as database

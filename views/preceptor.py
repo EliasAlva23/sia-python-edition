@@ -15,7 +15,7 @@ from core.reportes import (
     reporte_clase,
 )
 from core.tiempo import hoy
-from models import cuentas
+from models import cuentas, demo
 from models import justificativo as jus
 from models.asistencia import RegistroAsistencia
 from models.institucion import Institucion
@@ -28,7 +28,6 @@ from views.styles import (
     ESTADO,
     encabezado,
     estado_html,
-    guia_panel,
     kpi_grid,
     mini_barra,
     mostrar_errores,
@@ -54,12 +53,6 @@ def render(preceptor: Persona) -> None:
         ("Docentes", len(docentes), f"{sin_activar} sin activar su acceso" if sin_activar else "todos con acceso activo",
          "ambar" if sin_activar else "neutro"),
         ("Justificativos pendientes", pendientes, "para revisar", "ambar" if pendientes else "neutro"),
-    ])
-    guia_panel([
-        ("Registro manual", "Cargá presentes, tardes o ausentes de cualquier día."),
-        ("Docentes", "Alta con QR de invitación, clave temporal y bajas."),
-        ("Justificativos", "Aprobá certificados o justificá a varios a la vez."),
-        ("Clases de hoy", "Qué materias abrieron la clase y cuántos vinieron."),
     ])
     tabs = st.tabs(["Registro manual", "Docentes", "Justificativos", "Clases de hoy", "Vincular alumno",
                     "Consultar alumno"])
@@ -245,6 +238,9 @@ def _gestionar_docente(preceptor: Persona, institucion: Institucion, docentes) -
         nombres = {int(f.id): f"{f.apellido}, {f.nombre} · DNI {f.dni}" for f in docentes.itertuples()}
         docente_id = st.selectbox("Docente", list(nombres), format_func=nombres.get, key="pre_doc_sel")
         st.caption("Sus materias se muestran debajo. Desde acá podés restablecer su acceso o darlo de baja.")
+        if demo.es_cuenta_demo(docentes.set_index("id").loc[docente_id, "dni"]):
+            st.caption("Es una cuenta de demostración: su acceso no se restablece ni se da de baja.")
+            return docente_id
         c1, c2 = st.columns(2)
         if cuentas.puede_gestionar_clave(docente_id, institucion.id):
             if c1.button("Restablecer acceso", key=f"pre_reset_{docente_id}", icon=":material/key:", width="stretch",

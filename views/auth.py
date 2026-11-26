@@ -10,7 +10,7 @@ import streamlit as st
 
 from core import sesiones
 from core import validaciones as val
-from models import cuentas
+from models import cuentas, demo
 from models.asistencia import RegistroAsistencia
 from models.institucion import (
     NOMBRES_ROL,
@@ -169,7 +169,7 @@ def institucion_de_acceso() -> Institucion | None:
         del st.query_params["i"]
     if "inst_login" not in st.session_state:
         inst = Institucion.por_slug(_cookie(COOKIE_INSTITUCION))
-        activas = Institucion.todas()
+        activas = [i for i in Institucion.todas() if i.slug != demo.SLUG]
         if inst is None and len(activas) == 1:
             inst = activas[0]
         if inst:
@@ -217,6 +217,25 @@ def render_acceso() -> None:
             )
             if pendiente:
                 _registro_desde_clase(pendiente)
+            _ayuda_demo()
+
+
+def _ayuda_demo() -> None:
+    """Bloque discreto con los accesos de prueba y cómo entra la Administración general."""
+    if not demo.habilitada() or demo.institucion() is None:
+        return
+    with st.expander("Cuentas de prueba (demostración)", icon=":material/science:"):
+        filas = "".join(
+            f'<div class="fila"><b>{escape(perfil)}</b><span>Usuario <code>{escape(dni)}</code> · Clave '
+            f"<code>{escape(demo.clave())}</code></span><span class='sia-muted'>{escape(nombre)}</span></div>"
+            for perfil, dni, nombre in demo.cuentas_de_prueba())
+        st.markdown(
+            f'<div class="sia-demo">{filas}<p>Son datos ficticios del «{escape(demo.NOMBRE)}» (enlace <code>?i=demo</code>): '
+            "podés recorrer los paneles sin tocar datos reales.</p><p><b>Administración general:</b> ingresá con el DNI "
+            "configurado en <code>SIA_SUPERADMINS</code> (Secrets de Streamlit). La primera vez, con la clave "
+            "<code>SIA_SUPERADMIN_CLAVE_INICIAL</code>; después el sistema te pide crear la tuya.</p></div>",
+            unsafe_allow_html=True,
+        )
 
 
 def _accion_pendiente_vigente() -> dict | None:
@@ -236,7 +255,7 @@ def _accion_pendiente_vigente() -> dict | None:
 
 
 def _selector_institucion(actual: Institucion | None) -> Institucion | None:
-    activas = Institucion.todas()
+    activas = [i for i in Institucion.todas() if i.slug != demo.SLUG or (actual and actual.id == i.id)]
     if len(activas) <= 1:
         return actual or (activas[0] if activas else None)
     por_id = {i.id: i for i in activas}
@@ -277,7 +296,8 @@ def _form_login(institucion: Institucion | None) -> None:
     perfiles = perfiles_disponibles(persona)
     if institucion and not any(i and i.id == institucion.id for i, _ in perfiles):
         # Un estudiante de otra institución puede vincularse; el personal lo asigna Preceptoría o Dirección.
-        if any(r == "estudiante" for _, r in perfiles) or persona.rol == "estudiante":
+        es_estudiante = any(r == "estudiante" for _, r in perfiles) or persona.rol == "estudiante"
+        if es_estudiante and not demo.es_cuenta_demo(persona.dni) and institucion.slug != demo.SLUG:
             asignar_rol(persona.id, institucion.id, "estudiante")
             perfiles = perfiles_disponibles(persona)
     if not perfiles:
@@ -425,6 +445,9 @@ def render_cambio_obligatorio(persona: Persona) -> None:
 
 
 def render_cambio_password(persona: Persona) -> None:
+    if demo.es_cuenta_demo(persona.dni):
+        st.caption("Cuenta de demostración: la contraseña no se puede cambiar.")
+        return
     with st.popover("Cambiar contraseña", width="stretch"):
         with st.form("form_cambio_pw", clear_on_submit=True):
             actual = st.text_input("Contraseña actual", type="password")

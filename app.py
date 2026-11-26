@@ -6,6 +6,7 @@ Invitación del personal:  https://<app>/?invitacion=<token de un solo uso>  (QR
 """
 from __future__ import annotations
 
+import logging
 import sys
 import time
 from html import escape
@@ -44,6 +45,7 @@ st.set_page_config(
 )
 
 from core.database import asegurar_esquema  # noqa: E402
+from models import demo  # noqa: E402
 from models.asistencia import RegistroAsistencia  # noqa: E402
 from models.institucion import NOMBRES_ROL, mensaje_sistema  # noqa: E402
 from models.materia import Materia  # noqa: E402
@@ -122,6 +124,10 @@ def main() -> None:
                  "avisá a la administración del sistema.")
         st.caption(f"Detalle técnico: {type(exc).__name__}: {exc}")
         st.stop()
+    try:
+        demo.asegurar_demo()  # institución de prueba (idempotente; se desactiva con SIA_DEMO = "0")
+    except Exception:  # noqa: BLE001 - la demostración nunca debe impedir el ingreso
+        logging.getLogger("sia").exception("No se pudieron preparar los datos de demostración")
     _capturar_enlace_qr()
     persona = auth.usuario_actual()
     if persona is None:

@@ -28,7 +28,6 @@ from views.styles import (
     PALETAS,
     encabezado,
     estado_html,
-    guia_panel,
     kpi_grid,
     mostrar_errores,
     tabla_html,
@@ -49,11 +48,6 @@ def render(admin: Persona) -> None:
         ("Instituciones activas", activas, f"de {len(todas)} en total", "neutro", 100 * activas / len(todas) if todas else 0),
         ("Personas con cuenta", usuarios, "en todas las instituciones", "neutro"),
         ("Preceptoría", preceptoria, "personas asignadas", "neutro" if preceptoria else "ambar"),
-    ])
-    guia_panel([
-        ("Instituciones", "Alta, nombre, logo, colores, enlace ?i= y activar o suspender."),
-        ("Usuarios y roles", "Dar de alta Preceptoría o Dirección, asignar roles y restablecer accesos."),
-        ("Sistema", "Funciones habilitadas, aviso general y estado de la base."),
     ])
     tabs = st.tabs(["Instituciones", "Usuarios y roles", "Sistema"])
     with tabs[0]:

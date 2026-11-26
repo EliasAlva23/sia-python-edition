@@ -25,7 +25,6 @@ from views.styles import (
     COLORES_NIVEL,
     encabezado,
     estado_html,
-    guia_panel,
     kpi_grid,
     mini_barra,
     tabla_html,
@@ -38,12 +37,6 @@ PERIODOS = {"Últimos 30 días": 30, "Últimos 90 días": 90, "Todo el ciclo": N
 def render(directivo: Persona) -> None:
     inst = Institucion.obtener(st.session_state["institucion_id"])
     encabezado("Panel de Rectoría · Dirección", "Cómo viene la asistencia, la regularidad y la promoción")
-    guia_panel([
-        ("Resumen institucional", "Indicadores, gráficos y alumnos en riesgo, por período."),
-        ("Carreras y materias", "Carreras activas y qué carreras tiene cada docente."),
-        ("Personal", "Alta de Preceptoría, docentes y Dirección con QR de invitación."),
-        ("Configuración", "Porcentajes para regularizar y promocionar, logo y colores."),
-    ])
     tabs = st.tabs(["Resumen institucional", "Carreras y materias", "Personal", "Configuración"])
     with tabs[0]:
         _resumen(inst)

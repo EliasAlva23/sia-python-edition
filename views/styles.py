@@ -199,15 +199,17 @@ def _variables() -> str:
   --primary-hover: {mezclar(acento, '#FFFFFF', 0.12)}; --secondary: {_aclarar_para_oscuro(secundario)};
   --marca: {fondo_marca(primario)}; --grid: #26364F; --oliva: #A3B35A;
   --sombra: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 8px 24px -16px rgba(0, 0, 0, .6);
+  --sombra-alta: 0 1px 0 rgba(255, 255, 255, .05) inset, 0 18px 34px -18px rgba(0, 0, 0, .8);
   --boton-a: {mezclar(_aclarar_para_oscuro(secundario), SUPERFICIE_OSCURA, 0.35)}; --boton-b: {mezclar(acento, SUPERFICIE_OSCURA, 0.3)};
 """
     return f"""
-  --bg: {FONDO_CLARO}; --surface: #F7F8F4; --surface-2: #E9ECE5; --campo: #FBFBF8; --border: #D2D8CD;
-  --border-fuerte: #B4BCAF; --ink: {MARINO}; --ink-2: #26344A; --muted: #4E596A; --track: #DEE3DA;
+  --bg: #E7ECE5; --surface: #F0F3EC; --surface-2: #E1E8DF; --campo: #F6F8F2; --border: #C9D2C4;
+  --border-fuerte: #A9B4A4; --ink: {MARINO}; --ink-2: #26344A; --muted: #4A5566; --track: #D5DDD1;
   --primary: {primario}; --primary-ink: {tinta_sobre(primario)}; --primary-soft: {mezclar(primario, '#FFFFFF', 0.9)};
   --primary-hover: {mezclar(primario, MARINO, 0.25)}; --secondary: {secundario};
-  --marca: {fondo_marca(primario)}; --grid: #DDE1D9; --oliva: {OLIVA};
+  --marca: {fondo_marca(primario)}; --grid: #D3DACE; --oliva: {OLIVA};
   --sombra: 0 1px 2px rgba(20, 32, 51, .06), 0 10px 24px -18px rgba(20, 32, 51, .35);
+  --sombra-alta: 0 2px 4px rgba(20, 32, 51, .07), 0 18px 32px -20px rgba(20, 32, 51, .5);
   --boton-a: {mezclar(secundario, MARINO, 0.12)}; --boton-b: {mezclar(primario, MARINO, 0.1)};
 """
 
@@ -231,9 +233,14 @@ html, body, .stApp, .stApp p, .stApp li, .stApp label, .stApp input, .stApp text
 [data-testid="stMarkdownContainer"] h5 {{ font-size: 1rem; font-weight: 650; }}
 
 /* Base */
-.stApp, [data-testid="stAppViewContainer"] {{ background: var(--bg) !important; color: var(--ink); }}
+.stApp, [data-testid="stAppViewContainer"] {{ color: var(--ink); background:
+    radial-gradient(1100px 560px at 108% -12%, color-mix(in srgb, var(--secondary) 12%, transparent), transparent 62%),
+    radial-gradient(900px 520px at -12% 112%, color-mix(in srgb, var(--oliva) 11%, transparent), transparent 60%),
+    var(--bg) !important; background-attachment: fixed !important; }}
 .block-container {{ padding-top: 1.2rem; padding-bottom: 2.5rem; max-width: 1280px; }}
-section[data-testid="stSidebar"] {{ background: var(--surface) !important; border-right: 1px solid var(--border-fuerte); }}
+section[data-testid="stSidebar"] {{ border-right: 1px solid var(--border-fuerte);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--secondary) 10%, var(--surface)) 0%, var(--surface) 42%,
+    color-mix(in srgb, var(--oliva) 9%, var(--surface)) 100%) !important; }}
 section[data-testid="stSidebar"] * {{ color: var(--ink); }}
 [data-testid="stMarkdownContainer"] p, [data-testid="stMarkdownContainer"] li, [data-testid="stMarkdownContainer"] h1,
 [data-testid="stMarkdownContainer"] h2, [data-testid="stMarkdownContainer"] h3, [data-testid="stMarkdownContainer"] h4,
@@ -309,6 +316,22 @@ button[data-testid="stBaseButton-elementToolbar"] {{ border: none !important; ba
   box-shadow: var(--sombra);
 }}
 [data-testid="stForm"] {{ padding: 1.1rem 1.2rem !important; }}
+/* Micro-interacciones: transición corta, elevación leve solo en tarjetas (los formularios no se mueven) */
+.sia-card, .sia-hist-fila, .sia-alerta, .sia-riesgo, .sia-encabezado, div[data-testid="stVerticalBlockBorderWrapper"],
+[data-testid="stExpander"] details, [data-testid="stForm"], .stButton > button, .stDownloadButton > button,
+.stFormSubmitButton > button, [data-testid="stPopoverButton"], .stTabs [role="tab"] {{
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background-color .18s ease !important; }}
+.sia-card:hover, .sia-hist-fila:hover, .sia-alerta:hover, .sia-riesgo:hover {{ transform: translateY(-2px);
+  box-shadow: var(--sombra-alta); border-color: color-mix(in srgb, var(--primary) 38%, var(--border)) !important; }}
+div[data-testid="stVerticalBlockBorderWrapper"]:hover, [data-testid="stExpander"] details:hover, [data-testid="stForm"]:hover {{
+  box-shadow: var(--sombra-alta); border-color: color-mix(in srgb, var(--primary) 30%, var(--border)) !important; }}
+.stButton > button:hover, .stDownloadButton > button:hover, .stFormSubmitButton > button:hover {{ transform: translateY(-1px); }}
+.stTabs [role="tab"]:hover {{ border-bottom-color: color-mix(in srgb, var(--primary) 40%, transparent) !important; }}
+@media (prefers-reduced-motion: reduce) {{
+  *, *::before, *::after {{ transition: none !important; animation: none !important; }}
+  .sia-card:hover, .sia-hist-fila:hover, .sia-alerta:hover, .sia-riesgo:hover, .stButton > button:hover,
+  .stDownloadButton > button:hover, .stFormSubmitButton > button:hover {{ transform: none !important; }}
+}}
 [data-testid="stExpander"] summary {{ background: var(--surface) !important; border-radius: var(--radio); }}
 [data-testid="stExpander"] summary, [data-testid="stExpander"] summary p, [data-testid="stExpander"] summary span {{ color: var(--ink) !important; font-weight: 500; }}
 [data-testid="stExpander"] summary:hover {{ background: var(--surface-2) !important; }}
@@ -354,15 +377,6 @@ button[data-testid="stBaseButton-elementToolbar"] {{ border: none !important; ba
 .sia-encabezado p {{ margin: .2rem 0 0 0; color: var(--ink-2); font-size: 1rem; }}
 .sia-encabezado a, .sia-encabezado [data-testid="stHeaderActionElements"] {{ display: none !important; }}
 
-/* Guía «dónde estoy y qué puedo hacer» */
-.sia-guia {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .65rem; margin: 0 0 1.15rem; }}
-.sia-guia-item {{ display: flex; gap: .7rem; align-items: flex-start; background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radio); padding: .8rem .9rem; box-shadow: var(--sombra); }}
-.sia-guia-item .num {{ flex: 0 0 auto; width: 1.9rem; height: 1.9rem; border-radius: 50%; display: inline-flex; align-items: center;
-  justify-content: center; font-weight: 700; font-size: .9rem; color: var(--primary-ink); background: var(--primary); }}
-.sia-guia-item b {{ display: block; color: var(--ink); font-size: .98rem; line-height: 1.3; }}
-.sia-guia-item span {{ display: block; color: var(--muted); font-size: .9rem; line-height: 1.4; margin-top: .1rem; }}
-
 .sia-marca-lateral {{ display: flex; align-items: center; gap: .65rem; padding-bottom: .9rem; margin-bottom: .9rem;
   border-bottom: 1px solid var(--border); }}
 .sia-marca-lateral b {{ display: block; font-size: 1rem; color: var(--ink); line-height: 1.25; }}
@@ -394,23 +408,29 @@ button[data-testid="stBaseButton-elementToolbar"] {{ border: none !important; ba
   padding: 2.2rem 2.4rem; display: flex; flex-direction: column; gap: 1.2rem; }}
 .sia-login-fondo {{ position: absolute; inset: 0; width: 100%; height: 100%; z-index: -2; }}
 .sia-login-marca::after {{ content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: linear-gradient(100deg, rgba(10, 16, 28, .58) 0%, rgba(10, 16, 28, .26) 50%, rgba(10, 16, 28, 0) 85%); }}
+  background: linear-gradient(100deg, rgba(8, 14, 26, .66) 0%, rgba(8, 14, 26, .42) 55%, rgba(8, 14, 26, .14) 100%),
+    linear-gradient(180deg, rgba(8, 14, 26, .25) 0%, transparent 22%, transparent 78%, rgba(8, 14, 26, .35) 100%); }}
+.sia-login-marca .marca, .sia-login-marca .eyebrow, .sia-login-marca h2, .sia-login-marca p, .sia-login-marca li,
+.sia-login-marca .pie {{ text-shadow: 0 1px 2px rgba(6, 10, 18, .6), 0 4px 18px rgba(6, 10, 18, .4); }}
 .sia-login-marca .marca {{ display: flex; align-items: center; gap: .8rem; }}
 .sia-login-marca .marca b {{ display: block; font-size: 1.02rem; font-weight: 700; color: #fff; line-height: 1.25; }}
 .sia-login-marca .marca small {{ display: block; font-size: .82rem; color: rgba(255, 255, 255, .82); font-weight: 500; }}
 .sia-login-marca .sia-logo {{ background: #fff; border: 3px solid rgba(255, 255, 255, .3); }}
-.sia-login-marca .centro {{ margin: auto 0; display: grid; gap: 1.1rem; max-width: 30rem; }}
+.sia-login-marca .centro {{ margin: auto 0; display: grid; gap: 1.1rem; max-width: 31rem; padding: 1.5rem 1.6rem;
+  border-radius: 22px; border: 1px solid rgba(255, 255, 255, .14);
+  background: linear-gradient(140deg, rgba(10, 18, 32, .58), rgba(10, 18, 32, .34));
+  -webkit-backdrop-filter: blur(7px) saturate(115%); backdrop-filter: blur(7px) saturate(115%); }}
 .sia-login-marca .eyebrow {{ font-size: .8rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
-  color: color-mix(in srgb, var(--oliva) 40%, #fff); }}
+  color: color-mix(in srgb, var(--oliva) 28%, #fff); }}
 .sia-login-marca h2 {{ color: #fff !important; font-size: clamp(2rem, 3.4vw, 2.75rem) !important; font-weight: 800 !important;
   margin: 0 !important; padding: 0 !important; line-height: 1.08; letter-spacing: -.03em; }}
-.sia-login-marca p {{ color: rgba(255, 255, 255, .92) !important; font-size: 1.06rem; margin: 0; line-height: 1.55; }}
+.sia-login-marca p {{ color: #fff !important; font-size: 1.06rem; margin: 0; line-height: 1.55; }}
 .sia-login-marca ul {{ list-style: none; margin: .2rem 0 0; padding: 0; display: grid; gap: .8rem; }}
 .sia-login-marca li {{ display: flex; gap: .75rem; align-items: flex-start; color: #fff; margin: 0; }}
 .sia-login-marca li svg {{ flex: 0 0 auto; width: 26px; height: 26px; margin-top: .05rem; }}
 .sia-login-marca li b {{ display: block; font-size: 1rem; font-weight: 700; color: #fff; }}
-.sia-login-marca li span {{ display: block; font-size: .93rem; color: rgba(255, 255, 255, .84); line-height: 1.4; }}
-.sia-login-marca .pie {{ font-size: .85rem; color: rgba(255, 255, 255, .8); }}
+.sia-login-marca li span {{ display: block; font-size: .93rem; color: rgba(255, 255, 255, .92); line-height: 1.4; }}
+.sia-login-marca .pie {{ font-size: .85rem; color: rgba(255, 255, 255, .9); }}
 .sia-login-marca a, .sia-login-marca [data-testid="stHeaderActionElements"] {{ display: none !important; }}
 
 .sia-login-titulo h3 {{ font-size: 2.05rem !important; font-weight: 800 !important; margin: .3rem 0 0 !important; padding: 0 !important;
@@ -443,6 +463,13 @@ button[data-testid="stBaseButton-elementToolbar"] {{ border: none !important; ba
 .sia-login-separador {{ display: flex; align-items: center; gap: .8rem; color: var(--muted); font-size: .9rem; font-weight: 600; margin: .4rem 0 0; }}
 .sia-login-separador::before, .sia-login-separador::after {{ content: ""; flex: 1; height: 1px; background: var(--border-fuerte); }}
 .st-key-sia_tema_login {{ align-items: flex-end; }}
+.sia-demo {{ display: grid; gap: .45rem; font-size: .93rem; color: var(--ink-2); }}
+.sia-demo .fila {{ display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .55rem; padding: .45rem .6rem;
+  border-radius: var(--radio-chico); background: var(--surface-2); border: 1px solid var(--border); }}
+.sia-demo .fila b {{ color: var(--ink); min-width: 7.5rem; }}
+.sia-demo code {{ font-size: .9rem; padding: .05rem .35rem; border-radius: 6px; background: var(--campo); color: var(--ink);
+  border: 1px solid var(--border); }}
+.sia-demo p {{ margin: .2rem 0 0 !important; font-size: .9rem !important; color: var(--muted) !important; }}
 
 /* Cambio obligatorio de contraseña */
 .st-key-sia_cambio {{ max-width: 600px; margin: clamp(1rem, 7vh, 4rem) auto 0; background: var(--surface); border: 1px solid var(--border);
@@ -459,7 +486,8 @@ button[data-testid="stBaseButton-elementToolbar"] {{ border: none !important; ba
 .sia-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .85rem; margin-bottom: 1.2rem; }}
 .sia-grid .sia-card {{ margin-bottom: 0; }}
 /* Indicadores circulares: anillo proporcional al dato, valor al centro, etiqueta y contexto debajo */
-.sia-kpi {{ display: flex; flex-direction: column; align-items: center; text-align: center; gap: .55rem; padding: 1.1rem .9rem 1rem; }}
+.sia-kpi {{ display: flex; flex-direction: column; align-items: center; text-align: center; gap: .55rem; padding: 1.1rem .9rem 1rem;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 8%, var(--surface)) 0%, var(--surface) 62%) !important; }}
 .sia-anillo {{ position: relative; width: var(--d, 112px); aspect-ratio: 1; flex: 0 0 auto; }}
 .sia-anillo svg {{ width: 100%; height: 100%; display: block; transform: rotate(-90deg); }}
 .sia-anillo .pista {{ stroke: var(--track); }}
@@ -501,11 +529,13 @@ button[data-testid="stBaseButton-elementToolbar"] {{ border: none !important; ba
 .sia-tabla {{ width: 100%; max-width: 100%; margin: .3rem 0 1rem; }}
 .sia-tabla table {{ width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radio); overflow: hidden; font-size: .95rem; }}
-.sia-tabla th {{ background: var(--surface-2); color: var(--ink-2); text-align: left; font-weight: 700; padding: .6rem .75rem;
+.sia-tabla th {{ background: color-mix(in srgb, var(--primary) 9%, var(--surface-2)); color: var(--ink-2); text-align: left; font-weight: 700; padding: .6rem .75rem;
   font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border-fuerte); }}
 .sia-tabla td {{ padding: .6rem .75rem; color: var(--ink); border-bottom: 1px solid var(--border); overflow-wrap: break-word; vertical-align: top;
   font-variant-numeric: tabular-nums; }}
 .sia-tabla tr:last-child td {{ border-bottom: none; }}
+.sia-tabla tbody td {{ transition: background-color .15s ease; }}
+.sia-tabla tbody tr:hover td {{ background: color-mix(in srgb, var(--primary) 7%, transparent); }}
 .sia-tabla .sia-vacio {{ color: var(--muted); }}
 .sia-mini-barra {{ height: 4px; border-radius: 2px; background: var(--surface-2); margin-top: .3rem; overflow: hidden; max-width: 140px; }}
 .sia-mini-barra > div {{ height: 100%; background: var(--tono); }}
@@ -552,7 +582,7 @@ button[data-testid="stBaseButton-elementToolbar"] {{ border: none !important; ba
   .st-key-sia_login {{ border-radius: 20px; margin-top: 0; }}
   .st-key-sia_login [data-testid="stHorizontalBlock"]:has(.sia-login-marca) {{ gap: 0 !important; }}
   .sia-login-marca {{ min-height: 0; padding: 1.4rem 1.3rem 1.6rem; gap: .9rem; }}
-  .sia-login-marca .centro {{ margin: .4rem 0 0; gap: .6rem; }}
+  .sia-login-marca .centro {{ margin: .4rem 0 0; gap: .6rem; padding: 1rem 1.05rem; border-radius: 16px; }}
   .sia-login-marca h2 {{ font-size: 1.75rem !important; }}
   .sia-login-marca p {{ font-size: .98rem; }}
   .sia-login-marca ul, .sia-login-marca .pie {{ display: none; }}
@@ -564,11 +594,6 @@ button[data-testid="stBaseButton-elementToolbar"] {{ border: none !important; ba
   .sia-encabezado {{ padding: .9rem 1rem .9rem 1.25rem; gap: .8rem; }}
   .sia-encabezado h1 {{ font-size: 1.35rem !important; }}
   .sia-encabezado p {{ font-size: .93rem; }}
-  .sia-guia {{ grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; }}
-  .sia-guia-item {{ padding: .55rem .6rem; gap: .5rem; align-items: center; }}
-  .sia-guia-item .num {{ width: 1.6rem; height: 1.6rem; font-size: .82rem; }}
-  .sia-guia-item b {{ font-size: .9rem; }}
-  .sia-guia-item span {{ display: none; }}
   .sia-pin {{ font-size: 1.7rem; letter-spacing: .16em; }}
   .stTabs [role="tablist"] {{ gap: .2rem 1rem; }}
   [data-testid="stHorizontalBlock"] {{ flex-wrap: wrap !important; gap: .7rem !important; }}
@@ -583,7 +608,7 @@ _CSS_OSCURO = """
 <style>
 [data-testid="stDataFrame"], [data-testid="stDataEditor"] { filter: invert(0.9) hue-rotate(180deg); }
 [data-testid="stAlertContainer"] { background: var(--surface-2) !important; border: 1px solid var(--border-fuerte) !important; }
-.sia-login-marca::after { background: linear-gradient(100deg, rgba(6, 10, 18, .7) 0%, rgba(6, 10, 18, .4) 55%, rgba(6, 10, 18, .12) 100%); }
+.sia-login-marca::after { background: linear-gradient(100deg, rgba(6, 10, 18, .72) 0%, rgba(6, 10, 18, .48) 55%, rgba(6, 10, 18, .18) 100%); }
 [data-testid="stAlertContainer"] p, [data-testid="stAlertContainer"] li { color: var(--ink) !important; }
 .sia-logo { background: #fff; }
 </style>
@@ -717,14 +742,6 @@ def panel_login(items: list[tuple[str, str]]) -> None:
 
 def titulo_login(titulo: str, bajada: str) -> None:
     st.markdown(f'<div class="sia-login-titulo"><h3>{escape(titulo)}</h3><p>{escape(bajada)}</p></div>',
-                unsafe_allow_html=True)
-
-
-def guia_panel(pasos: list[tuple[str, str]]) -> None:
-    """Qué puede hacer la persona en este panel: cada paso nombra la pestaña y explica para qué sirve."""
-    items = "".join(f'<div class="sia-guia-item"><span class="num">{i}</span><div><b>{escape(titulo)}</b>'
-                    f"<span>{escape(detalle)}</span></div></div>" for i, (titulo, detalle) in enumerate(pasos, 1))
-    st.markdown(f'<div class="sia-guia" role="list" aria-label="Qué podés hacer en este panel">{items}</div>',
                 unsafe_allow_html=True)
 
 

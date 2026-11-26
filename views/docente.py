@@ -55,7 +55,6 @@ from views.styles import (
     encabezado,
     estado_html,
     grilla_historial,
-    guia_panel,
     kpi_grid,
     leyenda_historial,
     mini_barra,
@@ -84,12 +83,6 @@ def render(docente: Docente) -> None:
     materias = _filtrar_por_carrera(Materia.de_docente(docente.id, institucion.id), carreras)
     _banner_riesgo(materias)
     materia = _selector_materia(materias)
-    guia_panel([
-        ("Materias", "Tus materias con horario, alumnos y el QR para inscribirse."),
-        ("Clase en vivo", "Abrí la clase de hoy: proyectá el QR y los alumnos dan el presente."),
-        ("Lector QR", "Escaneá la credencial de un alumno o cargá su DNI."),
-        (TAB_HISTORIAL, "Asistencia por clase y alumno, y quiénes están en riesgo."),
-    ])
 
     tabs = st.tabs(["Materias", "Clase en vivo", "Lector QR", TAB_HISTORIAL, "Justificativos"])
     with tabs[0]:
