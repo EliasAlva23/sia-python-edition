@@ -246,7 +246,8 @@ def _tarjeta_materia(materia: Materia, institucion: Institucion, carreras: list[
             kpi_grid([
                 ("Alumnos", len(alumnos), "inscriptos", "neutro"),
                 ("Clases", len(clases), "dictadas", "neutro"),
-                ("En riesgo", en_riesgo, "pueden quedar libres", "rojo" if en_riesgo else "verde"),
+                ("En riesgo", en_riesgo, "pueden quedar libres", "rojo" if en_riesgo else "verde",
+                 100 * en_riesgo / len(alumnos) if len(alumnos) else 0),
             ])
             b1, b2, b3 = st.columns(3)
             if b1.button("Regenerar código", key=f"regen_{materia.id}", width="stretch", icon=":material/refresh:",
@@ -417,7 +418,7 @@ def _panel_presentes(clase_id: int, materia_id: int) -> None:
     inscriptos = len(materia.alumnos()) if materia else 0
     pct = 100 * len(presentes) / inscriptos if inscriptos else 0
     kpi_grid([
-        ("Presentes", f"{len(presentes)} / {inscriptos}", "registrados hoy", "neutro"),
+        ("Presentes", f"{len(presentes)}/{inscriptos}", "registrados hoy", "neutro", pct),
         ("Asistencia de hoy", f"{pct:.0f}%", "en tiempo real", tono_porcentaje(pct, materia.umbral if materia else 75)),
     ])
     tabla_html(_filas_presentes(presentes), {"hora": "Hora", "alumno": "Alumno/a", "estado": "Estado", "metodo": "Registro"},
@@ -569,9 +570,12 @@ def _tab_historial(materia: Materia, materias: list[Materia]) -> None:
     kpi_grid([
         ("Asistencia promedio", f"{promedio:.1f}%", f"{df['clase_id'].nunique()} clases dictadas",
          tono_porcentaje(promedio, materia.umbral)),
-        ("Promocionan", int(condicion.get("Promociona", 0)), f"≥ {materia.umbral_promocion:.0f}% de asistencia", "verde"),
-        ("Regulares", int(condicion.get("Regular", 0)), f"≥ {materia.umbral:.0f}%", "neutro"),
-        ("Libres", int(condicion.get("Libre", 0)), "debajo del umbral", "rojo" if condicion.get("Libre", 0) else "neutro"),
+        ("Promocionan", int(condicion.get("Promociona", 0)), f"≥ {materia.umbral_promocion:.0f}% de asistencia", "verde",
+         100 * condicion.get("Promociona", 0) / max(1, len(prediccion))),
+        ("Regulares", int(condicion.get("Regular", 0)), f"≥ {materia.umbral:.0f}%", "neutro",
+         100 * condicion.get("Regular", 0) / max(1, len(prediccion))),
+        ("Libres", int(condicion.get("Libre", 0)), "debajo del umbral", "rojo" if condicion.get("Libre", 0) else "neutro",
+         100 * condicion.get("Libre", 0) / max(1, len(prediccion))),
     ])
 
     if not multi:

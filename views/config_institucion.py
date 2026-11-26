@@ -7,7 +7,15 @@ import streamlit as st
 
 from core.validaciones import TOLERANCIAS_TARDE
 from models.institucion import Institucion
-from views.styles import configurar_tema, contraste, mostrar_errores, tinta_sobre
+from views.styles import (
+    PALETAS,
+    configurar_tema,
+    contraste,
+    mostrar_errores,
+    tinta_sobre,
+)
+
+ACTUALES = "Colores elegidos"
 
 
 def form_identidad(inst: Institucion, clave: str, permitir_slug: bool = False) -> None:
@@ -20,12 +28,17 @@ def form_identidad(inst: Institucion, clave: str, permitir_slug: bool = False) -
         if permitir_slug:
             slug = st.text_input("Identificador del enlace", value=inst.slug, max_chars=31,
                                  help="Minúsculas, números y guiones. El enlace queda …/?i=" + inst.slug)
+        paleta = st.radio("Paleta", [ACTUALES, *PALETAS], horizontal=True,
+                          help="Combinaciones de la paleta institucional de SIA. Con «Colores elegidos» se usan "
+                               "los dos selectores de abajo.")
         p1, p2 = st.columns(2)
         primario = p1.color_picker("Color principal", value=inst.color_primario,
-                                   help="Botones, pestaña activa, enlaces y panel de acceso.")
+                                   help="Botones, pestaña activa, anillos de los indicadores y panel de acceso.")
         secundario = p2.color_picker("Color secundario", value=inst.color_secundario, help="Detalles y acentos menores.")
         logo = st.file_uploader("Logo (PNG, JPG o WEBP, hasta 2 MB)", type=["png", "jpg", "jpeg", "webp"], key=f"{clave}_logo")
         guardar = st.form_submit_button("Guardar identidad", type="primary")
+    if paleta != ACTUALES:
+        primario, secundario = PALETAS[paleta]
     ratio = contraste(primario, tinta_sobre(primario))
     st.markdown(
         f'<div class="sia-card" style="display:flex;gap:.8rem;align-items:center;flex-wrap:wrap">'

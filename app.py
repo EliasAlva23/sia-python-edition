@@ -42,7 +42,7 @@ st.set_page_config(
     initial_sidebar_state="auto",
 )
 
-from core.database import init_db  # noqa: E402
+from core.database import asegurar_esquema  # noqa: E402
 from models.asistencia import RegistroAsistencia  # noqa: E402
 from models.institucion import NOMBRES_ROL, mensaje_sistema  # noqa: E402
 from models.materia import Materia  # noqa: E402
@@ -52,12 +52,6 @@ from views.styles import footer, inyectar_css, marca_sidebar, selector_tema  # n
 
 PANELES = {"estudiante": alumno, "docente": docente, "preceptor": preceptor, "directivo": directivo,
            "superadmin": superadmin}
-
-
-@st.cache_resource(show_spinner=False)
-def _inicializar_db() -> bool:
-    init_db()
-    return True
 
 
 def _capturar_enlace_qr() -> None:
@@ -115,7 +109,13 @@ def _pie_barra_lateral(persona) -> None:
 
 
 def main() -> None:
-    _inicializar_db()
+    try:
+        asegurar_esquema()  # siempre antes de cualquier consulta (login, cookies, enlace ?i=)
+    except Exception as exc:  # noqa: BLE001 - se informa en pantalla en lugar de caer con un traceback
+        st.error("No se pudo preparar la base de datos. Reintentá en unos segundos; si persiste, "
+                 "avisá a la administración del sistema.")
+        st.caption(f"Detalle técnico: {type(exc).__name__}: {exc}")
+        st.stop()
     _capturar_enlace_qr()
     persona = auth.usuario_actual()
     if persona is None:

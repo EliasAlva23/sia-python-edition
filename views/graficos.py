@@ -28,6 +28,19 @@ NOMBRE_NIVEL = {"ALTO": "Riesgo alto", "MEDIO": "Riesgo medio", "BAJO": "Sin rie
 ORDEN_CONDICION = ["Promociona", "Regular", "Libre"]
 
 
+def partir(texto, ancho: int = 20) -> str:
+    """Parte etiquetas largas en renglones (<br>) para que los ejes no se corten en pantallas angostas."""
+    renglones, actual = [], ""
+    for palabra in str(texto).split():
+        if actual and len(actual) + 1 + len(palabra) > ancho:
+            renglones.append(actual)
+            actual = palabra
+        else:
+            actual = f"{actual} {palabra}".strip()
+    renglones.append(actual)
+    return "<br>".join(renglones[:3]) + ("…" if len(renglones) > 3 else "")
+
+
 def mostrar(fig, alto: int = 320, titulo: str | None = None) -> None:
     st.plotly_chart(estilo_plotly(fig, alto, titulo), width="stretch", config=_CONFIG)
 
@@ -60,7 +73,7 @@ def barras(df: pd.DataFrame, x: str, y: str, titulo: str = "", sufijo: str = "%"
         st.caption("Todavía no hay datos para este gráfico.")
         return
     if horizontal:
-        df = df.sort_values(y)
+        df = df.sort_values(y).assign(**{x: lambda d: d[x].map(partir)})
         fig = px.bar(df, x=y, y=x, orientation="h", color_discrete_sequence=[color_serie_unica()],
                      labels={x: "", y: ""})
         fig.update_traces(hovertemplate=f"%{{y}}<br><b>%{{x:.0f}}{sufijo}</b><extra></extra>")
@@ -123,6 +136,7 @@ def condicion_apilada(conteos: pd.DataFrame, grupo: str, titulo: str = "") -> No
                          var_name="Condición", value_name="alumnos")
     totales = largo.groupby(grupo)["alumnos"].transform("sum").replace(0, 1)
     largo["pct"] = 100 * largo["alumnos"] / totales
+    largo[grupo] = largo[grupo].map(partir)
     fig = px.bar(largo, x="pct", y=grupo, color="Condición", orientation="h", barmode="stack",
                  color_discrete_map=COLORES_CONDICION, category_orders={"Condición": ORDEN_CONDICION},
                  labels={"pct": "", grupo: ""}, custom_data=["alumnos"])

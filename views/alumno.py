@@ -205,8 +205,9 @@ def _resumen(materias: list[Materia], df: pd.DataFrame) -> None:
         ("Asistencia general", f"{general:.0f}%" if total else "—",
          f"{presentes} de {total} clases" if total else "Sin clases todavía",
          tono_porcentaje(general, 75) if total else "neutro"),
-        ("Presentes", presentes, "incluye tardes y justificadas", "neutro"),
-        ("Ausencias", total - presentes, f"Racha actual: {racha}", "rojo" if racha >= 2 else "neutro"),
+        ("Presentes", presentes, "incluye tardes y justificadas", "neutro", 100 * presentes / total if total else None),
+        ("Ausencias", total - presentes, f"Racha actual: {racha}", "rojo" if racha >= 2 else "neutro",
+         100 * (total - presentes) / total if total else None),
         ("Materias", len(materias), tema()["corto"], "neutro"),
     ])
 

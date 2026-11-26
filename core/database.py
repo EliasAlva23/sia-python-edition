@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import threading
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -68,8 +69,8 @@ CREATE TABLE IF NOT EXISTS instituciones (
     slug             TEXT NOT NULL UNIQUE,
     nombre           TEXT NOT NULL,
     nombre_corto     TEXT NOT NULL,
-    color_primario   TEXT NOT NULL DEFAULT '#1F4E8C',
-    color_secundario TEXT NOT NULL DEFAULT '#6B7A99',
+    color_primario   TEXT NOT NULL DEFAULT '#2E5772',
+    color_secundario TEXT NOT NULL DEFAULT '#3F7C70',
     logo             BLOB,
     logo_mime        TEXT,
     umbral_regular   REAL NOT NULL DEFAULT 75 CHECK (umbral_regular BETWEEN 0 AND 100),
@@ -309,7 +310,7 @@ def _institucion_inicial(conn: sqlite3.Connection) -> None:
         conn.execute(
             """INSERT INTO instituciones (slug, nombre, nombre_corto, color_primario, color_secundario, logo, logo_mime,
                                           creado_en) VALUES ('ies11', 'Instituto de Educación Superior N° 11',
-                                          'IES N° 11', '#346FB0', '#7979B1', ?, ?, ?)""",
+                                          'IES N° 11', '#2E5772', '#3F7C70', ?, ?, ?)""",
             (logo.read_bytes() if logo.exists() else None, "image/png" if logo.exists() else None, _ahora()),
         )
     inicial = conn.execute("SELECT id FROM instituciones ORDER BY id LIMIT 1").fetchone()["id"]
@@ -338,6 +339,40 @@ def init_db() -> None:
                ON CONFLICT (clave) DO UPDATE SET valor = excluded.valor""",
             (SCHEMA_VERSION,),
         )
+
+
+_LOCK_ESQUEMA = threading.Lock()
+_TABLAS_CLAVE = ("instituciones", "membresias", "sesiones", "config")
+
+
+def esquema_al_dia() -> bool:
+    """True si la base existe, tiene las tablas de la versión actual y su schema_version coincide."""
+    if not DB_PATH.exists():
+        return False
+    try:
+        with get_connection() as conn:
+            presentes = {f["name"] for f in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+            if not set(_TABLAS_CLAVE) <= presentes:
+                return False
+            fila = conn.execute("SELECT valor FROM config WHERE clave = 'schema_version'").fetchone()
+            return bool(fila) and fila["valor"] == SCHEMA_VERSION and \
+                conn.execute("SELECT 1 FROM instituciones LIMIT 1").fetchone() is not None
+    except sqlite3.DatabaseError:
+        return False
+
+
+def asegurar_esquema() -> None:
+    """Garantiza el esquema actual antes de cualquier consulta (idempotente y seguro entre hilos).
+
+    Se llama en CADA ejecución de la app y no se cachea con st.cache_resource: en Streamlit Cloud el proceso
+    sobrevive a las actualizaciones del repositorio, y un resultado cacheado de la versión anterior dejaría la
+    base sin migrar (p. ej. sin la tabla «instituciones»). El chequeo cuesta una consulta liviana.
+    """
+    if esquema_al_dia():
+        return
+    with _LOCK_ESQUEMA:
+        if not esquema_al_dia():  # otro hilo pudo haberla migrado mientras esperábamos
+            init_db()
 
 
 def tablas_existentes() -> list[str]:

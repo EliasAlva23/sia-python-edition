@@ -1,7 +1,8 @@
 """Sistema visual de SIA: sobrio, corporativo y personalizable por institución (white-label).
 
-Principios: superficies neutras, un único color de acento (el primario de cada institución), bordes finos,
-sin degradés ni sombras marcadas, tipografía Inter. Los colores y el logo se toman de la institución
+Principios: fondo claro suave (#EEF0EC), texto en azul marino profundo (#142033), un único color de acento
+(el primario de cada institución), bordes finos, sin degradés, indicadores en tarjetas circulares y tipografía
+Plus Jakarta Sans (con Inter y la fuente del sistema como respaldo). Los colores y el logo se toman de la institución
 activa (`configurar_tema`); si no hay ninguna, se usan los valores por defecto de SIA.
 """
 from __future__ import annotations
@@ -10,6 +11,7 @@ import base64
 import colorsys
 import hashlib
 import io
+import re
 from functools import lru_cache
 from html import escape
 from pathlib import Path
@@ -22,9 +24,21 @@ EQUIPO = "Tech & Innovation Team"
 PRODUCTO = "SIA"
 PRODUCTO_LARGO = "Sistema de Asistencia Inteligente"
 
-# Valores por defecto (sin institución activa)
-PRIMARIO_DEFECTO = "#1F4E8C"
-SECUNDARIO_DEFECTO = "#6B7A99"
+# Paleta base de SIA (también se ofrece como presets al configurar una institución)
+MARINO = "#142033"      # azul marino profundo: texto, panel de acceso
+ACERO = "#2E5772"       # azul acero: acento por defecto
+VERDE_AZULADO = "#3F7C70"
+OLIVA = "#70812B"
+FONDO_CLARO = "#EEF0EC"
+PALETAS = {
+    "Acero y marino": (ACERO, MARINO),
+    "Verde azulado": (VERDE_AZULADO, ACERO),
+    "Oliva": (OLIVA, VERDE_AZULADO),
+    "Marino profundo": (MARINO, ACERO),
+}
+PRIMARIO_DEFECTO = ACERO
+SECUNDARIO_DEFECTO = VERDE_AZULADO
+FUENTE = "'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
 
 # Compatibilidad con módulos anteriores (constantes de la institución inicial)
 INSTITUCION = "Instituto de Educación Superior N° 11"
@@ -80,15 +94,28 @@ def tinta_sobre(fondo: str) -> str:
     return "#FFFFFF" if contraste(fondo, "#FFFFFF") >= contraste(fondo, "#111827") else "#111827"
 
 
+SUPERFICIE_OSCURA = "#142033"
+
+
 def _aclarar_para_oscuro(color: str) -> str:
     """En modo oscuro el acento se aclara hasta contrastar al menos 4.5:1 con la superficie."""
     h, luz, s = colorsys.rgb_to_hls(*_rgb(color))
     for _ in range(12):
         candidato = _hex(colorsys.hls_to_rgb(h, luz, s))
-        if contraste(candidato, "#161A21") >= 4.5:
+        if contraste(candidato, SUPERFICIE_OSCURA) >= 4.5:
             return candidato
         luz = min(0.85, luz + 0.05)
     return _hex(colorsys.hls_to_rgb(h, luz, s))
+
+
+def fondo_marca(color: str) -> str:
+    """Fondo del panel de acceso: el color institucional llevado hacia el marino hasta que el texto blanco
+    contraste al menos 7:1 (nivel AAA), para que cualquier marca se lea bien."""
+    for paso in range(11):
+        candidato = mezclar(color, MARINO, min(1.0, 0.35 + paso * 0.065))
+        if contraste(candidato, "#FFFFFF") >= 7:
+            return candidato
+    return MARINO
 
 
 # ---------------------------------------------------------------- institución activa
@@ -161,38 +188,39 @@ def ruta_logo() -> Path | None:
 # ---------------------------------------------------------------- CSS
 def _variables() -> str:
     t = tema()
-    primario = t["primario"]
+    primario, secundario = t["primario"], t["secundario"]
     if modo_oscuro():
         acento = _aclarar_para_oscuro(primario)
         return f"""
-  --bg: #0E1116; --surface: #161A21; --surface-2: #1D222B; --border: #2A303A; --border-fuerte: #3A414D;
-  --ink: #E8EAED; --ink-2: #C4C9D2; --muted: #9AA3AF;
-  --primary: {acento}; --primary-ink: {tinta_sobre(acento)}; --primary-soft: {mezclar(acento, '#161A21', 0.82)};
-  --primary-hover: {mezclar(acento, '#FFFFFF', 0.12)};
-  --grid: #2c2c2a; --sombra: none;
+  --bg: #0D1522; --surface: #142033; --surface-2: #1B2A40; --border: #26364F; --border-fuerte: #34465F;
+  --ink: #EEF0EC; --ink-2: #CDD3DB; --muted: #9FAABB; --track: #22324A;
+  --primary: {acento}; --primary-ink: {tinta_sobre(acento)}; --primary-soft: {mezclar(acento, SUPERFICIE_OSCURA, 0.8)};
+  --primary-hover: {mezclar(acento, '#FFFFFF', 0.12)}; --secondary: {_aclarar_para_oscuro(secundario)};
+  --marca: {fondo_marca(primario)}; --grid: #26364F; --sombra: none;
 """
     return f"""
-  --bg: #F6F7F9; --surface: #FFFFFF; --surface-2: #F1F3F6; --border: #E5E7EB; --border-fuerte: #D1D5DB;
-  --ink: #111827; --ink-2: #374151; --muted: #6B7280;
-  --primary: {primario}; --primary-ink: {tinta_sobre(primario)}; --primary-soft: {mezclar(primario, '#FFFFFF', 0.90)};
-  --primary-hover: {mezclar(primario, '#000000', 0.12)};
-  --grid: #e1e0d9; --sombra: 0 1px 2px rgba(17, 24, 39, .05);
+  --bg: {FONDO_CLARO}; --surface: #FFFFFF; --surface-2: #F5F6F3; --border: #DCDFD8; --border-fuerte: #C5CAC1;
+  --ink: {MARINO}; --ink-2: #2F3B4E; --muted: #5A6475; --track: #E6E9E3;
+  --primary: {primario}; --primary-ink: {tinta_sobre(primario)}; --primary-soft: {mezclar(primario, '#FFFFFF', 0.9)};
+  --primary-hover: {mezclar(primario, MARINO, 0.25)}; --secondary: {secundario};
+  --marca: {fondo_marca(primario)}; --grid: #E1E4DE; --sombra: 0 1px 2px rgba(20, 32, 51, .05);
 """
 
 
 _CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
 :root, .stApp {{ {variables}
-  --critico: #d03b3b; --advertencia: #b7791f; --bueno: #0a7f0a; --radio: 8px; --radio-chico: 6px; }}
+  --critico: #d03b3b; --advertencia: #b7791f; --bueno: #0a7f0a; --radio: 14px; --radio-chico: 10px; }}
 
 /* Tipografía (sin tocar los íconos Material de Streamlit) */
 html, body, .stApp, .stApp p, .stApp li, .stApp label, .stApp input, .stApp textarea, .stApp button,
 .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp td, .stApp th, .stApp small,
 [data-testid="stMarkdownContainer"], [data-testid="stWidgetLabel"], [role="tab"], [role="option"] {{
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif !important;
+  font-family: {fuente} !important; -webkit-font-smoothing: antialiased;
 }}
-.stApp h1, .stApp h2, .stApp h3, .stApp h4 {{ font-weight: 600 !important; letter-spacing: -0.01em; }}
+.stApp h1, .stApp h2, .stApp h3, .stApp h4 {{ font-weight: 700 !important; letter-spacing: -0.015em; }}
+.stApp p, .stApp li {{ line-height: 1.6; }}
 [data-testid="stMarkdownContainer"] h3 {{ font-size: 1.15rem; margin-top: .6rem; }}
 [data-testid="stMarkdownContainer"] h4 {{ font-size: 1rem; }}
 [data-testid="stMarkdownContainer"] h5 {{ font-size: .92rem; font-weight: 600; }}
@@ -206,7 +234,7 @@ section[data-testid="stSidebar"] * {{ color: var(--ink); }}
 [data-testid="stMarkdownContainer"] h2, [data-testid="stMarkdownContainer"] h3, [data-testid="stMarkdownContainer"] h4,
 [data-testid="stMarkdownContainer"] h5, [data-testid="stHeading"] *, [data-testid="stWidgetLabel"] p,
 [data-testid="stWidgetLabel"] label, .stRadio label p, .stCheckbox label p, [data-testid="stToggle"] p {{ color: var(--ink); }}
-[data-testid="stWidgetLabel"] p {{ font-weight: 500; font-size: .875rem; }}
+[data-testid="stWidgetLabel"] p {{ font-weight: 600; font-size: .86rem; color: var(--ink-2) !important; }}
 [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p {{ color: var(--muted) !important; }}
 [data-testid="stMarkdownContainer"] a {{ color: var(--primary); }}
 hr {{ border-color: var(--border) !important; }}
@@ -302,47 +330,70 @@ button[data-testid="stBaseButton-elementToolbar"] {{ border: none !important; ba
 .stTabs [data-testid="stTabScrollButton"] {{ display: none !important; }}
 
 /* ---------- Componentes SIA ---------- */
-.sia-logo {{ display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radio-chico);
+.sia-logo {{ display: inline-flex; align-items: center; justify-content: center; border-radius: 50%;
   object-fit: contain; background: #fff; border: 1px solid var(--border); flex: 0 0 auto; }}
 .sia-logo-iniciales {{ font-weight: 700; font-size: .8rem; letter-spacing: .02em; border: none; }}
 
-.sia-encabezado {{ display: flex; align-items: center; gap: .9rem; padding: .2rem 0 1rem; margin-bottom: 1.1rem;
-  border-bottom: 1px solid var(--border); }}
+.sia-encabezado {{ display: flex; align-items: center; gap: 1rem; padding: .2rem 0 1.1rem; margin-bottom: 1.2rem;
+  border-bottom: 1px solid var(--border); position: relative; }}
+.sia-encabezado::after {{ content: ""; position: absolute; left: 0; bottom: -1px; width: 72px; height: 3px;
+  border-radius: 3px; background: var(--primary); }}
 .sia-encabezado .textos {{ min-width: 0; }}
-.sia-encabezado .institucion {{ color: var(--muted); font-size: .8rem; font-weight: 500; }}
-.sia-encabezado h1 {{ font-size: 1.45rem !important; margin: .05rem 0 0 0 !important; padding: 0 !important; color: var(--ink) !important; line-height: 1.25; }}
+.sia-encabezado .institucion {{ color: var(--muted); font-size: .76rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .06em; }}
+.sia-encabezado h1 {{ font-size: 1.55rem !important; margin: .05rem 0 0 0 !important; padding: 0 !important; color: var(--ink) !important; line-height: 1.25; }}
 .sia-encabezado p {{ margin: .15rem 0 0 0; color: var(--muted); font-size: .9rem; }}
 .sia-encabezado a, .sia-encabezado [data-testid="stHeaderActionElements"] {{ display: none !important; }}
 
-.sia-marca {{ display: flex; align-items: center; gap: .65rem; padding-bottom: .9rem; margin-bottom: .9rem;
+.sia-marca-lateral {{ display: flex; align-items: center; gap: .65rem; padding-bottom: .9rem; margin-bottom: .9rem;
   border-bottom: 1px solid var(--border); }}
-.sia-marca b {{ display: block; font-size: .92rem; color: var(--ink); line-height: 1.25; }}
-.sia-marca small {{ display: block; font-size: .75rem; color: var(--muted); }}
+.sia-marca-lateral b {{ display: block; font-size: .92rem; color: var(--ink); line-height: 1.25; }}
+.sia-marca-lateral small {{ display: block; font-size: .75rem; color: var(--muted); }}
 
 .sia-usuario {{ font-size: .88rem; line-height: 1.45; padding: .1rem 0 .4rem; }}
 .sia-usuario b {{ display: block; color: var(--ink); }}
 .sia-usuario span {{ color: var(--muted); }}
 
-/* Login: panel institucional + formulario */
-.sia-login-marca {{ background: var(--primary); color: var(--primary-ink); border-radius: var(--radio); padding: 2rem 1.8rem;
-  min-height: 100%; display: flex; flex-direction: column; gap: 1.2rem; }}
-.sia-login-marca .sia-logo {{ background: #fff; border: none; }}
-.sia-login-marca h2 {{ color: var(--primary-ink) !important; font-size: 1.4rem !important; margin: 0 !important; padding: 0 !important; line-height: 1.3; }}
-.sia-login-marca p, .sia-login-marca li {{ color: var(--primary-ink) !important; opacity: .92; font-size: .92rem; margin: 0; }}
-.sia-login-marca ul {{ margin: 0; padding-left: 1.1rem; display: grid; gap: .35rem; }}
-.sia-login-marca .pie {{ margin-top: auto; font-size: .78rem; opacity: .8; }}
+/* Login: panel institucional (marino teñido con el color de la institución) + formulario */
+.sia-login-marca {{ position: relative; overflow: hidden; background: var(--marca); color: #fff; border-radius: 20px;
+  padding: 2.2rem 2rem; min-height: 520px; display: flex; flex-direction: column; gap: 1.4rem; }}
+.sia-login-marca::before, .sia-login-marca::after {{ content: ""; position: absolute; border-radius: 50%; pointer-events: none;
+  border: 1.5px solid rgba(255, 255, 255, .13); }}
+.sia-login-marca::before {{ width: 340px; height: 340px; right: -120px; bottom: -120px; box-shadow: 0 0 0 46px rgba(255,255,255,.04); }}
+.sia-login-marca::after {{ width: 150px; height: 150px; right: 40px; top: -60px; border-color: color-mix(in srgb, var(--secondary) 70%, #fff); opacity: .5; }}
+.sia-login-marca > * {{ position: relative; z-index: 1; }}
+.sia-login-marca .sia-logo {{ background: #fff; border: 3px solid rgba(255,255,255,.25); }}
+.sia-login-marca .eyebrow {{ font-size: .74rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; opacity: .75; }}
+.sia-login-marca h2 {{ color: #fff !important; font-size: 1.75rem !important; font-weight: 700 !important; margin: .35rem 0 0 !important;
+  padding: 0 !important; line-height: 1.2; letter-spacing: -.02em; }}
+.sia-login-marca p, .sia-login-marca li {{ color: rgba(255,255,255,.88) !important; font-size: .95rem; margin: 0; line-height: 1.55; }}
+.sia-login-marca ul {{ list-style: none; margin: 0; padding: 0; display: grid; gap: .7rem; }}
+.sia-login-marca li {{ display: flex; gap: .7rem; align-items: flex-start; }}
+.sia-login-marca li::before {{ content: ""; flex: 0 0 auto; width: 18px; height: 18px; margin-top: .15rem; border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--secondary) 65%, #fff); }}
+.sia-login-marca .pie {{ margin-top: auto; font-size: .78rem; color: rgba(255,255,255,.7); }}
 .sia-login-marca a, .sia-login-marca [data-testid="stHeaderActionElements"] {{ display: none !important; }}
+.sia-login-titulo h3 {{ font-size: 1.5rem !important; font-weight: 700 !important; margin: 0 !important; padding: 0 !important; }}
+.sia-login-titulo p {{ color: var(--muted); margin: .25rem 0 .6rem; font-size: .93rem; }}
 
 .sia-card {{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radio); padding: 1rem 1.1rem;
   margin-bottom: .75rem; color: var(--ink); overflow-wrap: anywhere; box-shadow: var(--sombra); }}
 .sia-card .muted, .sia-muted {{ color: var(--muted); font-size: .86rem; }}
-.sia-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .75rem; margin-bottom: 1rem; }}
+.sia-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: .8rem; margin-bottom: 1.1rem; }}
 .sia-grid .sia-card {{ margin-bottom: 0; }}
-.sia-kpi {{ border-left: 3px solid var(--tono, var(--border)); }}
-.sia-kpi .label {{ font-size: .75rem; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }}
-.sia-kpi .value {{ font-size: 1.65rem; font-weight: 600; color: var(--ink); line-height: 1.2; margin-top: .25rem;
-  font-variant-numeric: tabular-nums; }}
-.sia-kpi .sub {{ font-size: .8rem; color: var(--muted); margin-top: .15rem; }}
+/* Indicadores circulares: anillo proporcional al dato, valor al centro, etiqueta y contexto debajo */
+.sia-kpi {{ display: flex; flex-direction: column; align-items: center; text-align: center; gap: .55rem; padding: 1.1rem .9rem 1rem; }}
+.sia-anillo {{ position: relative; width: var(--d, 112px); aspect-ratio: 1; flex: 0 0 auto; }}
+.sia-anillo svg {{ width: 100%; height: 100%; display: block; transform: rotate(-90deg); }}
+.sia-anillo .pista {{ stroke: var(--track); }}
+.sia-anillo .arco {{ stroke: var(--tono, var(--primary)); stroke-linecap: round; }}
+.sia-anillo .centro {{ position: absolute; inset: 14%; border-radius: 50%; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; line-height: 1.1; }}
+.sia-kpi .value {{ font-size: var(--fs, 1.45rem); font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em; max-width: 100%; overflow-wrap: anywhere; }}
+.sia-kpi .label {{ font-size: .82rem; font-weight: 600; color: var(--ink-2); line-height: 1.3; }}
+.sia-kpi .sub {{ font-size: .76rem; color: var(--muted); line-height: 1.35; margin-top: -.3rem; }}
+.sia-kpi.texto .value {{ font-size: 1.05rem; }}
 
 .sia-chips {{ display: flex; flex-wrap: wrap; gap: .35rem; margin: .3rem 0 .6rem; }}
 .sia-chip {{ display: inline-flex; align-items: center; padding: .15rem .55rem; border-radius: 4px; background: var(--surface-2);
@@ -415,15 +466,18 @@ button[data-testid="stBaseButton-elementToolbar"] {{ border: none !important; ba
 .sia-pie img {{ width: 28px; height: 28px; object-fit: contain; background: #fff; border-radius: 4px; border: 1px solid var(--border); }}
 
 @media (max-width: 768px) {{
-  .block-container {{ padding: .9rem .8rem 3rem !important; }}
+  .block-container {{ padding: 3.4rem .8rem 3rem !important; }}
   .sia-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }}
-  .sia-kpi .value {{ font-size: 1.3rem; }}
+  .sia-kpi {{ padding: .9rem .5rem .8rem; }}
+  .sia-anillo {{ --d: 92px; }}
+  .sia-kpi .value {{ font-size: calc(var(--fs, 1.45rem) * .88); }}
+  .sia-login-marca {{ min-height: 0; padding: 1.6rem 1.3rem; }}
+  .sia-login-marca h2 {{ font-size: 1.35rem !important; }}
   .sia-encabezado h1 {{ font-size: 1.2rem !important; }}
   .sia-pin {{ font-size: 1.7rem; letter-spacing: .16em; }}
   .stTabs [role="tablist"] {{ gap: .2rem 1rem; }}
   [data-testid="stHorizontalBlock"] {{ flex-wrap: wrap !important; gap: .7rem !important; }}
   [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{ width: 100% !important; flex: 1 1 100% !important; min-width: 100% !important; }}
-  .sia-login-marca {{ padding: 1.4rem 1.2rem; }}
 }}
 @media (max-width: 340px) {{ .sia-grid {{ grid-template-columns: 1fr; }} }}
 </style>
@@ -469,7 +523,7 @@ div[style*="position: fixed"][style*="bottom"]:not(:has(iframe:not([title="strea
 
 
 def inyectar_css() -> None:
-    css = _CSS.format(variables=_variables()) + f"<style>{CSS_OCULTAR_CLOUD}</style>"
+    css = _CSS.format(variables=_variables(), fuente=FUENTE) + f"<style>{CSS_OCULTAR_CLOUD}</style>"
     st.markdown(css + (_CSS_OSCURO if modo_oscuro() else ""), unsafe_allow_html=True)
 
 
@@ -497,7 +551,7 @@ hero = encabezado  # compatibilidad
 
 def marca_sidebar() -> None:
     t = tema()
-    st.markdown(f'<div class="sia-marca">{logo_html(36)}<div><b>{_html(t["corto"])}</b>'
+    st.markdown(f'<div class="sia-marca-lateral">{logo_html(36)}<div><b>{_html(t["corto"])}</b>'
                 f'<small>{PRODUCTO} · {PRODUCTO_LARGO}</small></div></div>', unsafe_allow_html=True)
 
 
@@ -505,11 +559,16 @@ def panel_login(lineas: list[str]) -> None:
     t = tema()
     items = "".join(f"<li>{escape(x)}</li>" for x in lineas)
     st.markdown(
-        f'<div class="sia-login-marca">{logo_html(56)}<div><h2>{_html(t["nombre"])}</h2>'
-        f'<p>{PRODUCTO} · {PRODUCTO_LARGO}</p></div><ul>{items}</ul>'
+        f'<div class="sia-login-marca">{logo_html(64)}<div><div class="eyebrow">{PRODUCTO} · {PRODUCTO_LARGO}</div>'
+        f'<h2>{_html(t["nombre"])}</h2></div><ul>{items}</ul>'
         f'<div class="pie">Desarrollado por {EQUIPO}</div></div>',
         unsafe_allow_html=True,
     )
+
+
+def titulo_login(titulo: str, bajada: str) -> None:
+    st.markdown(f'<div class="sia-login-titulo"><h3>{escape(titulo)}</h3><p>{escape(bajada)}</p></div>',
+                unsafe_allow_html=True)
 
 
 def footer() -> None:
@@ -523,25 +582,54 @@ def aviso(html_seguro: str) -> None:
     st.markdown(f'<div class="sia-aviso">{html_seguro}</div>', unsafe_allow_html=True)
 
 
-def _kpi_html(label: str, valor, sub: str = "", tono: str = "neutro") -> str:
-    estilo = f' style="--tono:{TONOS[tono]}"' if tono in ("rojo", "ambar", "verde") else ""
-    return (f'<div class="sia-card sia-kpi"{estilo}><div class="label">{escape(label)}</div>'
-            f'<div class="value">{escape(str(valor))}</div><div class="sub">{escape(sub)}</div></div>')
+def _pct_de(valor) -> float | None:
+    """Extrae el porcentaje de un valor como «60.8%» (para dibujar el anillo)."""
+    m = re.fullmatch(r"\s*(-?\d+(?:[.,]\d+)?)\s*%\s*", str(valor))
+    return float(m.group(1).replace(",", ".")) if m else None
 
 
-def kpi(label: str, valor, sub: str = "", tono: str = "neutro") -> None:
-    st.markdown(_kpi_html(label, valor, sub, tono), unsafe_allow_html=True)
+def anillo_html(valor, pct: float | None, color: str | None = None, diametro: int | None = None) -> str:
+    """Anillo SVG: el arco cubre `pct` % de la circunferencia; sin pct, se muestra el círculo completo en tono suave."""
+    texto = str(valor)
+    fs = 1.45 if len(texto) <= 4 else 1.2 if len(texto) <= 6 else 1.0 if len(texto) <= 8 else .85
+    estilo = f"--fs:{fs}rem;" + (f"--tono:{color};" if color else "") + (f"--d:{diametro}px;" if diametro else "")
+    if pct is None:
+        arco = '<circle class="arco" cx="50" cy="50" r="43" fill="none" stroke-width="7" stroke-opacity=".45"/>'
+    else:
+        pct = max(0.0, min(100.0, float(pct)))
+        arco = ('<circle class="arco" cx="50" cy="50" r="43" fill="none" stroke-width="7" pathLength="100" '
+                f'stroke-dasharray="{pct:.1f} 100" stroke-opacity="{1 if pct > 0 else 0}"/>')
+    return (f'<div class="sia-anillo" style="{estilo}" role="img" aria-label="{escape(texto)}">'
+            '<svg viewBox="0 0 100 100" aria-hidden="true">'
+            '<circle class="pista" cx="50" cy="50" r="43" fill="none" stroke-width="7"/>'
+            f'{arco}</svg><div class="centro"><span class="value">{escape(texto)}</span></div></div>')
+
+
+def _kpi_html(label: str, valor, sub: str = "", tono: str = "neutro", pct: float | None = None) -> str:
+    """Tarjeta circular. pct: proporción a dibujar (si el valor es «NN%» se toma de ahí). tono: color de estado
+    (rojo / ámbar / verde) o el color institucional para «neutro»."""
+    color = TONOS[tono] if tono in ("rojo", "ambar", "verde") else None
+    pct = _pct_de(valor) if pct is None else pct
+    return (f'<div class="sia-card sia-kpi">{anillo_html(valor, pct, color)}'
+            f'<div class="label">{escape(label)}</div>{f"<div class=sub>{escape(sub)}</div>" if sub else ""}</div>')
+
+
+def kpi(label: str, valor, sub: str = "", tono: str = "neutro", pct: float | None = None) -> None:
+    st.markdown(_kpi_html(label, valor, sub, tono, pct), unsafe_allow_html=True)
 
 
 def kpi_grid(items: list[tuple]) -> None:
+    """items: (etiqueta, valor, contexto, tono[, pct])."""
     st.markdown(f'<div class="sia-grid">{"".join(_kpi_html(*i) for i in items)}</div>', unsafe_allow_html=True)
 
 
 def tarjeta_progreso(titulo: str, valor: str, detalle: str, pct: float, tono: str) -> str:
-    color = TONOS.get(tono, tono)
-    return (f'<div class="sia-card sia-kpi" style="--tono:{color}"><div class="label">{escape(titulo)}</div>'
-            f'<div class="value">{escape(valor)}</div><div class="sub">{escape(detalle)}</div>'
-            f'<div class="sia-barra"><div style="width:{max(0, min(100, pct)):.0f}%"></div></div></div>')
+    """Tarjeta circular de una materia: el anillo muestra el porcentaje de asistencia."""
+    color = TONOS.get(tono) if tono in ("rojo", "ambar", "verde") else None
+    centro = f"{pct:.0f}%" if valor != "—" else "—"
+    return (f'<div class="sia-card sia-kpi">{anillo_html(centro, pct if valor != "—" else None, color)}'
+            f'<div class="label">{escape(titulo)}</div><div class="sub">{escape(valor if valor != "—" else detalle)}'
+            f'{"<br>" + escape(detalle) if valor != "—" else ""}</div></div>')
 
 
 def chips(items: list[str]) -> str:
@@ -655,21 +743,22 @@ def color_serie_unica() -> str:
 def estilo_plotly(fig, alto: int = 340, titulo: str | None = None):
     """Estilo analítico sobrio: grilla en líneas finas, ejes recesivos, sin títulos de leyenda, una sola escala."""
     oscuro = modo_oscuro()
-    tinta, secundaria, apagada = ("#f0efec", "#c3c2b7", "#898781") if oscuro else ("#0b0b0b", "#52514e", "#898781")
-    grilla, base = ("#2c2c2a", "#383835") if oscuro else ("#e1e0d9", "#c3c2b7")
+    tinta, secundaria, apagada = ("#EEF0EC", "#CDD3DB", "#9FAABB") if oscuro else (MARINO, "#2F3B4E", "#5A6475")
+    grilla, base = ("#26364F", "#34465F") if oscuro else ("#E1E4DE", "#C5CAC1")
     if titulo is not None:
         fig.update_layout(title_text=titulo)
+    leyenda = sum(1 for t in fig.data if t.showlegend is not False) > 1
     fig.update_layout(
         template="plotly_dark" if oscuro else "plotly_white",
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", height=alto,
-        margin=dict(l=8, r=12, t=56 if fig.layout.title.text else 16, b=8),
-        font=dict(family="Inter, system-ui, -apple-system, 'Segoe UI', sans-serif", size=12, color=secundaria),
+        margin=dict(l=8, r=12, t=48 if fig.layout.title.text else 12, b=46 if leyenda else 8),
+        font=dict(family=FUENTE.replace("'", ""), size=12, color=secundaria),
         title=dict(x=0, xanchor="left", y=0.97, yanchor="top", yref="container", font=dict(size=14, color=tinta)),
-        legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="left", x=0, title_text="",
+        legend=dict(orientation="h", yanchor="bottom", y=0, yref="container", xanchor="left", x=0, title_text="",
                     font=dict(size=12, color=secundaria), bgcolor="rgba(0,0,0,0)"),
-        hoverlabel=dict(bgcolor="#1a1a19" if oscuro else "#ffffff", bordercolor=grilla,
-                        font=dict(color=tinta, size=12, family="Inter, system-ui, sans-serif")),
-        colorway=series(), bargap=0.35, hovermode="closest",
+        hoverlabel=dict(bgcolor=SUPERFICIE_OSCURA if oscuro else "#ffffff", bordercolor=grilla,
+                        font=dict(color=tinta, size=12, family=FUENTE.replace("'", ""))),
+        colorway=series(), bargap=0.35, hovermode="closest", separators=",.",
     )
     ejes = dict(gridcolor=grilla, gridwidth=1, zeroline=False, linecolor=base, showline=True, ticks="",
                 tickfont=dict(color=apagada, size=11), title_font=dict(color=secundaria, size=12))
@@ -687,7 +776,7 @@ def estilo_plotly(fig, alto: int = 340, titulo: str | None = None):
 
 def linea_referencia(fig, valor: float, texto: str, eje: str = "y") -> None:
     """Umbral como línea fina continua (no punteada) con su etiqueta."""
-    color = "#898781"
+    color = "#9FAABB" if modo_oscuro() else "#5A6475"
     if eje == "y":
         fig.add_hline(y=valor, line_width=1, line_color=color, annotation_text=texto, annotation_position="top left")
     else:

@@ -21,6 +21,7 @@ from models.persona import Persona, RepositorioPersonas
 from views.config_institucion import form_identidad, form_umbrales
 from views.styles import (
     ESTADO,
+    PALETAS,
     encabezado,
     estado_html,
     kpi_grid,
@@ -28,6 +29,7 @@ from views.styles import (
     tabla_html,
 )
 
+PERSONALIZADA = "Personalizada"
 ROLES_ASIGNABLES = ("estudiante", "docente", "preceptor", "directivo")
 
 
@@ -107,8 +109,10 @@ def _alta_institucion() -> None:
         corto = c2.text_input("Nombre corto *", placeholder="IS N° 5", max_chars=40)
         slug = c3.text_input("Identificador del enlace *", placeholder="is5", max_chars=31)
         p1, p2, p3 = st.columns(3)
-        primario = p1.color_picker("Color principal", "#1F4E79")
-        secundario = p2.color_picker("Color secundario", "#6B7A90")
+        paleta = st.radio("Paleta", [*PALETAS, PERSONALIZADA], horizontal=True,
+                          help="Combinaciones de la paleta institucional de SIA, o colores propios con «Personalizada».")
+        primario = p1.color_picker("Color principal (personalizada)", "#2E5772")
+        secundario = p2.color_picker("Color secundario (personalizada)", "#3F7C70")
         tolerancia = p3.selectbox("Tolerancia «tarde»", TOLERANCIAS_TARDE, index=1,
                                   format_func=lambda m: "Sin tolerancia" if m == 0 else f"{m} minutos")
         u1, u2 = st.columns(2)
@@ -121,6 +125,8 @@ def _alta_institucion() -> None:
         crear = st.form_submit_button("Crear institución", type="primary")
     if not crear:
         return
+    if paleta != PERSONALIZADA:
+        primario, secundario = PALETAS[paleta]
     try:
         inst = Institucion.crear(nombre=nombre, nombre_corto=corto, slug=slug.strip().lower(), color_primario=primario,
                                  color_secundario=secundario, umbral_regular=regular, umbral_promocion=promocion,
@@ -161,8 +167,8 @@ def _usuarios() -> None:
             (persona.id,),
         ).fetchall()
         sesiones = conn.execute("SELECT COUNT(*) FROM sesiones WHERE usuario_id = ?", (persona.id,)).fetchone()[0]
-    kpi_grid([("Persona", persona.nombre_completo, f"DNI {persona.dni}", "neutro"),
-              ("Roles", len(filas), "en todas las instituciones", "neutro"),
+    st.markdown(f"**{persona.nombre_completo}** · DNI {persona.dni} · {persona.email}")
+    kpi_grid([("Roles", len(filas), "en todas las instituciones", "neutro"),
               ("Sesiones abiertas", sesiones, "", "neutro")])
     tabla_html([{"inst": f["nombre"], "rol": NOMBRES_ROL[f["rol"]], "desde": (f["creado_en"] or "")[:10]} for f in filas],
                {"inst": "Institución", "rol": "Rol", "desde": "Desde"}, vacio="Sin roles asignados.")

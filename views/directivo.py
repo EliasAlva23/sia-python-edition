@@ -108,7 +108,7 @@ def _resumen(inst: Institucion) -> None:
         ("Promocionan", f"{100 * cond.get('Promociona', 0) / total:.0f}%", f"{cond.get('Promociona', 0)} de {total} cursadas", "verde"),
         ("Regulares", f"{100 * cond.get('Regular', 0) / total:.0f}%", f"umbral {inst.umbral_regular:.0f}%", "neutro"),
         ("Libres", f"{100 * cond.get('Libre', 0) / total:.0f}%", f"{cond.get('Libre', 0)} cursadas", "rojo" if cond.get("Libre", 0) else "neutro"),
-        ("En riesgo alto", riesgo, "alumno-materia", "rojo" if riesgo else "verde"),
+        ("En riesgo alto", riesgo, f"de {total} cursadas", "rojo" if riesgo else "verde", 100 * riesgo / total),
         ("Materias activas", len(materias), f"{df['estudiante_id'].nunique()} estudiantes con clases", "neutro"),
     ])
 

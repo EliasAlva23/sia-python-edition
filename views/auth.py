@@ -25,6 +25,7 @@ from views.styles import (
     configurar_tema,
     mostrar_errores,
     panel_login,
+    titulo_login,
 )
 
 MINUTOS_INACTIVIDAD = sesiones.MINUTOS_INACTIVIDAD
@@ -175,7 +176,7 @@ def render_acceso() -> None:
     inyectar_css()  # recolorea la pantalla con la identidad de la institución elegida
     mensaje = st.session_state.pop("aviso_sesion", None)
 
-    marca, formulario = st.columns([1, 1.15], gap="large")
+    marca, formulario = st.columns([1, 1.05], gap="large", vertical_alignment="center")
     with marca:
         panel_login([
             "Asistencia por QR, PIN o registro de Preceptoría",
@@ -197,7 +198,7 @@ def render_acceso() -> None:
         if st.session_state.get("_login_perfiles"):
             _elegir_perfil()
             return
-        st.markdown("### Ingresar")
+        titulo_login("Te damos la bienvenida", "Ingresá con tu DNI o email. Si es tu primera vez, creá tu cuenta.")
         tab_login, tab_registro = st.tabs(["Ingresar", "Crear cuenta"])
         with tab_login:
             _form_login(institucion)
